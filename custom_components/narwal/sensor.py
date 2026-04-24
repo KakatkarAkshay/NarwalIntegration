@@ -67,6 +67,14 @@ SENSOR_DESCRIPTIONS: tuple[NarwalSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda state: state.firmware_version or None,
     ),
+    NarwalSensorEntityDescription(
+        key="current_room",
+        translation_key="current_room",
+        icon="mdi:map-marker",
+        # working_status field 6: room_id of the room currently being cleaned.
+        # Resolved to a display name via the cached room map from get_map.
+        value_fn=lambda state: state.current_room_name,
+    ),
 )
 
 
