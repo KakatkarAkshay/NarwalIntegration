@@ -31,11 +31,21 @@ PLATFORMS: list[Platform] = [
     Platform.CAMERA,
 ]
 
-FAN_SPEED_MAP: dict[str, FanLevel] = {
-    "quiet": FanLevel.QUIET,
-    "normal": FanLevel.NORMAL,
-    "strong": FanLevel.STRONG,
-    "max": FanLevel.MAX,
+# HA fan_speed labels → FanLevel, verbatim from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super powerful" and SUPER as "Ultra powerful".
+_FAN_SPEED_CANONICAL: dict[str, FanLevel] = {
+    "Quiet": FanLevel.MUTE,
+    "Standard": FanLevel.NORMAL,
+    "Strong": FanLevel.STRONG,
+    "Super powerful": FanLevel.DEEP,
+    "Ultra powerful": FanLevel.SUPER,
 }
 
-FAN_SPEED_LIST: list[str] = list(FAN_SPEED_MAP.keys())
+FAN_SPEED_LIST: list[str] = list(_FAN_SPEED_CANONICAL)
+
+# FAN_SPEED_MAP also accepts the original lowercase fan_speed values (quiet/normal/strong/max) so existing automations keep working; these aliases are not offered in FAN_SPEED_LIST.
+FAN_SPEED_MAP: dict[str, FanLevel] = _FAN_SPEED_CANONICAL | {
+    "quiet": FanLevel.MUTE,
+    "normal": FanLevel.NORMAL,
+    "strong": FanLevel.STRONG,
+    "max": FanLevel.SUPER,
+}
