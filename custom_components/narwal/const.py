@@ -32,7 +32,18 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.CAMERA,
+    Platform.SWITCH,
 ]
+
+CONF_SHOW_ROOM_LABELS = "show_room_labels"
+CONF_SHOW_FURNITURE = "show_furniture"
+CONF_SHOW_FURNITURE_LABELS = "show_furniture_labels"
+
+MAP_OPTION_DEFAULTS: dict[str, bool] = {
+    CONF_SHOW_ROOM_LABELS: True,
+    CONF_SHOW_FURNITURE: False,
+    CONF_SHOW_FURNITURE_LABELS: False,
+}
 
 FAN_SPEED_MAP: dict[str, FanLevel] = {
     "quiet": FanLevel.QUIET,
