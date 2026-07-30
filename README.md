@@ -2,19 +2,20 @@
 
 A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant.io/) custom integration for Narwal robot vacuums. Communicates directly with your vacuum over your local network via WebSocket — no cloud account or internet connection required.
 
-> **v1.0.0** — Vacuum control, sensors, live map with room labels, and obstacle overlay. Available via HACS.
+> **v1.0.1** — Vacuum control, sensors, live map with room labels, and obstacle overlay. Available via HACS.
 
-> ### ⚠️ Known broken in v1.0.0
+> ### ⚠️ Known broken in v1.0.1
 >
 > Community reverse-engineering in July 2026 found that **room-specific cleaning has never worked correctly**. The integration sends clean commands to `clean/plan/start`, which ignores the payload and runs whatever plan is stored on the robot. Three contributors confirmed this independently ([#37](https://github.com/sjmotew/NarwalIntegration/issues/37)).
 >
 > | Issue | Impact | Fix |
 > |---|---|---|
 > | **Room cleaning ignores your selection** | The robot cleans its last plan or your first Narwal-app shortcut instead of the rooms you picked. On **Flow 2** it can also clear the map stored on the robot, which you then have to reopen manually in the Narwal app ([#55](https://github.com/sjmotew/NarwalIntegration/issues/55)) | [#49](https://github.com/sjmotew/NarwalIntegration/pull/49) |
-> | **Cleaning area sensor stuck at 1.8 m²** | The sensor reads a station timer, not covered area — it has never reported a real value | [#51](https://github.com/sjmotew/NarwalIntegration/pull/51) |
-> | **Wrong room type labels** | Unnamed rooms show incorrect types on all models (the base lookup table is misaligned) | [#48](https://github.com/sjmotew/NarwalIntegration/pull/48) |
+> | **Wrong room type labels** | Unnamed rooms show incorrect types on all models. The lookup table is misaligned from index 5 — e.g. a bathroom may display as "Study". Rooms you have named in the Narwal app are unaffected. The fix is written but its enum ordering is not yet confirmed, so it is deliberately held back rather than shipped wrong twice | [#48](https://github.com/sjmotew/NarwalIntegration/pull/48) |
 >
-> **Until the fix ships, start cleans from the Narwal app rather than Home Assistant if you are on a Flow 2.** Whole-house `vacuum.start`, status, sensors, and the map are unaffected. Progress is tracked in [#66](https://github.com/sjmotew/NarwalIntegration/issues/66).
+> **Fixed in v1.0.1:** the cleaning-area sensor now reports real covered area instead of a constant 1.8 m² ([#51](https://github.com/sjmotew/NarwalIntegration/pull/51)).
+>
+> **Until the room-clean fix ships, start cleans from the Narwal app rather than Home Assistant if you are on a Flow 2.** Whole-house `vacuum.start` is also affected on newer firmware — it reports success and does nothing ([#69](https://github.com/sjmotew/NarwalIntegration/issues/69)). Status, sensors, and the map are unaffected. Progress is tracked in [#66](https://github.com/sjmotew/NarwalIntegration/issues/66).
 
 ## Device Compatibility
 
