@@ -26,7 +26,7 @@ This integration uses a **local WebSocket connection on port 9002**. Only models
 | **Narwal Flow** (AX12) | **Working** | Primary development target. On firmware v01.07.22+, `vacuum.start` needs a loaded map ([#36](https://github.com/sjmotew/NarwalIntegration/issues/36)). |
 | **Narwal Flow 2** (QxMSPG6VSO) | **Working** | See the room-cleaning warning above before using `vacuum.clean_area` |
 | **Freo Z10 Ultra** (CX4) | **Working** | Community confirmed |
-| **Freo Z10 Turbo** (AX26) | **Working** | Community confirmed on firmware v01.02.00.15 ([#40](https://github.com/sjmotew/NarwalIntegration/issues/40)) |
+| **Freo Z10 Pro / Turbo** (AX26) | **Working** | Same product key and firmware (v01.02.00.15) reported under both names ([#40](https://github.com/sjmotew/NarwalIntegration/issues/40), [#70](https://github.com/sjmotew/NarwalIntegration/issues/70)). Room cleaning confirmed working with [#49](https://github.com/sjmotew/NarwalIntegration/pull/49). |
 | **Freo X10 Pro** (AX15) | **Working** | Community confirmed ([#12](https://github.com/sjmotew/NarwalIntegration/issues/12)) |
 | **Narwal JX** | **Unconfirmed** | Product key known, no working report yet — testers welcome ([#42](https://github.com/sjmotew/NarwalIntegration/issues/42)) |
 | **Freo Z Ultra** (CX7) | **Not Compatible** | Port 9002 open but no local broadcasts; cloud-only ([#5](https://github.com/sjmotew/NarwalIntegration/issues/5), confirmed by @Folg0re) |

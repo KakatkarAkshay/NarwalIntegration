@@ -25,6 +25,9 @@ KNOWN_PRODUCT_KEYS = [
     "QoEsI5qYXO",  # AX12 — Narwal Flow (primary, confirmed)
     "QxMSPG6VSO",  # Narwal Flow 2 (confirmed working via local WebSocket)
     "DrzDKQ0MU8",   # CX4  — Freo Z10 Ultra (confirmed by @irekkl-maker)
+    # AX26 — sold as both "Freo Z10 Turbo" (@romedtino, #40) and "Freo Z10 Pro"
+    # (@shin906710, #70); same key, same FW v01.02.00.15, so one platform.
+    "qV6BujoYLz",   # AX26 — Freo Z10 Pro / Turbo (confirmed local WebSocket)
     # Confirmed cloud-only (port 9002 open but no local broadcasts)
     "BYWBPqSxeC",   # CX7  — Freo Z Ultra (cloud-only, confirmed by @gabrielozcomidi)
     # Confirmed cloud-only (ZeroMQ port 6789, no WebSocket)
@@ -38,7 +41,6 @@ KNOWN_PRODUCT_KEYS = [
     "E9Q8aDzUbp",   # AX17
     "jI5rHi4mKa",   # AX24
     "UuTSLsMce4",   # AX25
-    "qV6BujoYLz",   # AX26
     "88OLXLpkjT",   # BX4  (note: APK also has 3rIGshGNAj — may vary by FW revision)
     "3rIGshGNAj",   # BX4/Y1 alternate key (APK, contributed by @northwestsupra)
     "7sSZZ4XfTI",   # CX2

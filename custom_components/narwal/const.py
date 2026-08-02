@@ -17,6 +17,9 @@ NARWAL_MODELS: dict[str, str] = {
     "Narwal Flow": "QoEsI5qYXO",
     "Narwal Flow 2": "QxMSPG6VSO",
     "Narwal Freo Z10 Ultra": "DrzDKQ0MU8",
+    # AX26 ships under two marketing names on identical firmware (v01.02.00.15):
+    # "Z10 Turbo" (@romedtino, #40) and "Z10 Pro" (@shin906710, #70), same product_key.
+    "Narwal Freo Z10 Pro / Turbo": "qV6BujoYLz",
     "Narwal Freo X10 Pro": "CNbforyZWI",
     "Other / Auto-detect": "auto",
 }
