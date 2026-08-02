@@ -127,6 +127,12 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 Use the [issue templates](https://github.com/sjmotew/NarwalIntegration/issues/new/choose) — they collect your HA version, model, and debug logs for faster diagnosis.
 
+## Protocol Documentation
+
+[**docs/PROTOCOL.md**](docs/PROTOCOL.md) documents the local WebSocket protocol — frame format, topic reference, message field maps, and the open questions. It also records the assumptions this project got wrong and how they were caught, which is the part most likely to save someone else time.
+
+Corrections and captures are welcome; the doc explains how to take them.
+
 ## Disclaimer
 
 This is an **unofficial**, community-developed integration — not affiliated with or endorsed by Narwal. The local protocol was reverse-engineered from network traffic and the Narwal mobile application.
