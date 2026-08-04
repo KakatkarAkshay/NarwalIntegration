@@ -80,6 +80,11 @@
       "station_bag": {
         "name": "Station dust bag"
       }
+    },
+    "light": {
+      "dock_light": {
+        "name": "Dock light"
+      }
     }
   }
 }

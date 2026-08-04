@@ -2,7 +2,7 @@
 
 from homeassistant.const import Platform
 
-from .narwal_client import FanLevel
+from .narwal_client import AmbientLightCtrlType, FanLevel
 
 DOMAIN = "narwal"
 DEFAULT_PORT = 9002
@@ -32,7 +32,30 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.CAMERA,
+    Platform.LIGHT,
 ]
+
+CONF_DOCK_LIGHT_SUPPORTED = "dock_light_supported"
+
+DOCK_LIGHT_PRODUCT_KEYS = {"QxMSPG6VSO", "iSuVlI1If2"}
+
+
+def is_dock_light_supported(data: dict, options: dict | None = None) -> bool:
+    """Return whether this configured model exposes dock ambient lighting."""
+    if options and CONF_DOCK_LIGHT_SUPPORTED in options:
+        return bool(options[CONF_DOCK_LIGHT_SUPPORTED])
+    return data.get(CONF_PRODUCT_KEY) in DOCK_LIGHT_PRODUCT_KEYS
+
+
+DOCK_LIGHT_MODES: dict[str, AmbientLightCtrlType] = {
+    "Off": AmbientLightCtrlType.OFF,
+    "Fireplace": AmbientLightCtrlType.WINTER_WARMTH,
+    "Nightlight": AmbientLightCtrlType.NIGHT_LIGHT,
+    "Purple": AmbientLightCtrlType.PURPLE_LIGHT,
+}
+DOCK_LIGHT_MODE_NAMES: dict[int, str] = {
+    int(value): key for key, value in DOCK_LIGHT_MODES.items()
+}
 
 FAN_SPEED_MAP: dict[str, FanLevel] = {
     "quiet": FanLevel.QUIET,

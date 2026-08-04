@@ -24,6 +24,7 @@ from .const import (
     RECONNECT_MAX_DELAY,
     TOPIC_CMD_ACTIVE_ROBOT,
     TOPIC_CMD_APP_HEARTBEAT,
+    TOPIC_CMD_AMBIENT_LIGHT_CTRL,
     TOPIC_CMD_CANCEL,
     TOPIC_CMD_DRY_MOP,
     TOPIC_CMD_DUST_GATHERING,
@@ -50,6 +51,7 @@ from .const import (
     TOPIC_CMD_YELL,
     DEFAULT_TOPIC_PREFIX,
     WAKE_TIMEOUT,
+    AmbientLightCtrlType,
     CommandResult,
     FanLevel,
     MopHumidity,
@@ -1369,3 +1371,30 @@ class NarwalClient:
             _LOGGER.warning(
                 "set_led(%s) unexpected result_code=%d", on, resp.result_code
             )
+
+    async def set_ambient_light_mode(
+        self, mode: AmbientLightCtrlType | int
+    ) -> CommandResponse | None:
+        """Set the base station ambient light mode."""
+        mode = AmbientLightCtrlType(mode)
+        payload = self._encode_varint_field(1, int(mode))
+        try:
+            resp = await self.send_command(
+                TOPIC_CMD_AMBIENT_LIGHT_CTRL,
+                payload=payload,
+            )
+        except Exception:
+            _LOGGER.warning("set_ambient_light_mode(%s) command failed", mode)
+            return None
+        if resp.result_code not in (
+            0,
+            CommandResult.SUCCESS,
+            CommandResult.NOT_APPLICABLE,
+            CommandResult.APPLIED,
+        ):
+            _LOGGER.warning(
+                "set_ambient_light_mode(%s) unexpected result_code=%d",
+                mode,
+                resp.result_code,
+            )
+        return resp

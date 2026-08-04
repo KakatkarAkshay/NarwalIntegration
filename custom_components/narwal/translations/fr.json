@@ -80,6 +80,11 @@
       "station_bag": {
         "name": "Sac à poussière de la station"
       }
+    },
+    "light": {
+      "dock_light": {
+        "name": "Éclairage de la station"
+      }
     }
   }
 }

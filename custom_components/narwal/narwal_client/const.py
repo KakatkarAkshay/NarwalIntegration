@@ -24,6 +24,7 @@ KNOWN_PRODUCT_KEYS = [
     # Confirmed working (local WebSocket)
     "QoEsI5qYXO",  # AX12 — Narwal Flow (primary, confirmed)
     "QxMSPG6VSO",  # Narwal Flow 2 (confirmed working via local WebSocket)
+    "iSuVlI1If2",  # Narwal Flow 2 alternate key (confirmed working locally)
     "DrzDKQ0MU8",   # CX4  — Freo Z10 Ultra (confirmed by @irekkl-maker)
     # AX26 — sold as both "Freo Z10 Turbo" (@romedtino, #40) and "Freo Z10 Pro"
     # (@shin906710, #70); same key, same FW v01.02.00.15, so one platform.
@@ -79,6 +80,7 @@ TOPIC_CMD_FORCE_END = "task/force_end"
 TOPIC_CMD_CANCEL = "task/cancel"
 
 # Supply/dock
+TOPIC_CMD_AMBIENT_LIGHT_CTRL = "supply/ambient_light_ctrl"
 TOPIC_CMD_RECALL = "supply/recall"
 TOPIC_CMD_WASH_MOP = "supply/wash_mop"
 TOPIC_CMD_DRY_MOP = "supply/dry_mop"
@@ -145,6 +147,16 @@ class CommandResult(IntEnum):
     SUCCESS = 1
     NOT_APPLICABLE = 2  # e.g., set_fan_level when not cleaning
     CONFLICT = 3  # e.g., recall when already recalling
+    APPLIED = 6  # observed on ambient light commands after the dock light changes
+
+
+class AmbientLightCtrlType(IntEnum):
+    """Base station ambient light mode."""
+
+    OFF = 0
+    NIGHT_LIGHT = 1
+    WINTER_WARMTH = 2
+    PURPLE_LIGHT = 3
 
 
 class WorkingStatus(IntEnum):
