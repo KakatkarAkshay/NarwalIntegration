@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from narwal_client.client import NarwalClient, NarwalConnectionError
-from narwal_client.const import CommandResult
+from narwal_client.const import CommandResult, WorkingStatus
 from narwal_client.models import CommandResponse, MapData, RoomInfo
 
 
@@ -30,6 +30,32 @@ class TestNarwalClientInit:
         client = NarwalClient("10.0.0.1")
         assert not client.connected
         assert client.state.battery_level == 0
+
+    def test_unconfirmed_idle_base_status_preserves_active_metrics(self) -> None:
+        """Stale idle base_status must not hide a fresh working_status task."""
+        client = NarwalClient("10.0.0.1")
+        client._update_from_working_status_broadcast({"3": 120})
+
+        client._update_from_base_status_broadcast(
+            {"3": {"1": 1}, "11": 1, "47": 2, "2": 87.0}
+        )
+
+        assert client.state.working_status == WorkingStatus.CLEANING
+        assert client.state.battery_level == 87
+        assert client.state.is_cleaning
+
+    def test_confirmed_dock_base_status_ends_active_metrics(self) -> None:
+        """Fresh dock indicators are trusted even after active task metrics."""
+        client = NarwalClient("10.0.0.1")
+        client._update_from_working_status_broadcast({"3": 120})
+
+        client._update_from_base_status_broadcast(
+            {"3": {"1": 10}, "11": 2, "47": 3}
+        )
+
+        assert client.state.working_status == WorkingStatus.DOCKED
+        assert not client.state.has_recent_active_working_status
+        assert client.state.is_docked
 
     @pytest.mark.asyncio
     async def test_commands_require_connection(self) -> None:

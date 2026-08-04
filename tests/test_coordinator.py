@@ -109,6 +109,18 @@ class TestCoordinatorResilience:
         assert coordinator._consecutive_failures == 0
         assert result is coordinator.client.state
 
+    async def test_poll_preserves_recent_active_working_status(self) -> None:
+        """Poll only refreshes hardware fields while task metrics are fresh."""
+        coordinator = self._make_coordinator()
+        type(coordinator.client).connected = PropertyMock(return_value=True)
+        coordinator.client.state.update_from_working_status({"3": 120})
+        coordinator.client.get_status = AsyncMock()
+
+        result = await coordinator._async_update_data()
+
+        coordinator.client.get_status.assert_awaited_once_with(full_update=False)
+        assert result is coordinator.client.state
+
     async def test_push_update_resets_failure_counter(self) -> None:
         """_on_state_update resets _consecutive_failures to 0."""
         coordinator = self._make_coordinator()

@@ -53,6 +53,7 @@ from .const import (
     CommandResult,
     FanLevel,
     MopHumidity,
+    WorkingStatus,
 )
 from .models import CommandResponse, DeviceInfo, MapData, MapDisplayData, NarwalState
 from .protocol import (
@@ -64,6 +65,56 @@ from .protocol import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+_STALE_DOCK_BASE_STATUSES = {
+    WorkingStatus.UNKNOWN,
+    WorkingStatus.STANDBY,
+    WorkingStatus.DOCKED,
+    WorkingStatus.CHARGED,
+    WorkingStatus.DOCKED_V2,
+}
+
+
+def _base_status_working_status(decoded: dict[str, Any] | object) -> WorkingStatus | None:
+    """Extract robot_base_status field 3.1."""
+    if not isinstance(decoded, dict):
+        return None
+    field3 = decoded.get("3")
+    if isinstance(field3, list):
+        field3 = field3[0] if field3 else None
+    if not isinstance(field3, dict) or "1" not in field3:
+        return None
+    try:
+        return WorkingStatus(int(field3["1"]))
+    except (TypeError, ValueError):
+        return None
+
+
+def _base_status_confirms_docked(
+    decoded: dict[str, Any] | object, status: WorkingStatus | None
+) -> bool:
+    """Return true when a terminal status also carries live dock indicators."""
+    if not isinstance(decoded, dict) or status not in _STALE_DOCK_BASE_STATUSES:
+        return False
+
+    field3 = decoded.get("3")
+    if isinstance(field3, list):
+        field3 = field3[0] if field3 else None
+    field3 = field3 if isinstance(field3, dict) else {}
+
+    def int_field(container: dict[str, Any], field: str) -> int:
+        try:
+            return int(container.get(field, 0))
+        except (TypeError, ValueError):
+            return 0
+
+    return (
+        int_field(decoded, "11") >= 2
+        or int_field(decoded, "47") in (1, 3)
+        or int_field(field3, "3") in (1, 6)
+        or int_field(field3, "10") == 1
+        or int_field(field3, "12") > 0
+    )
 
 
 class NarwalConnectionError(Exception):
@@ -144,6 +195,27 @@ class NarwalClient:
         if self._last_display_map_time <= 0:
             return 999.0
         return time.monotonic() - self._last_display_map_time
+
+    def _update_from_working_status_broadcast(self, decoded: dict[str, Any]) -> None:
+        """Apply live task metrics from the working_status broadcast."""
+        self.state.update_from_working_status(decoded)
+
+    def _update_from_base_status_broadcast(self, decoded: dict[str, Any]) -> None:
+        """Apply a base-status broadcast without clobbering fresh task metrics."""
+        status = _base_status_working_status(decoded)
+        if (
+            self.state.has_recent_active_working_status
+            and status in _STALE_DOCK_BASE_STATUSES
+            and not _base_status_confirms_docked(decoded, status)
+        ):
+            self.state.update_battery_from_base_status(decoded)
+            _LOGGER.debug(
+                "Ignoring stale base_status=%s while working_status task metrics are fresh",
+                status.name if status else "unknown",
+            )
+            return
+
+        self.state.update_from_base_status(decoded)
 
     async def connect(self) -> None:
         """Establish WebSocket connection to the vacuum.
@@ -410,9 +482,9 @@ class NarwalClient:
             return
 
         if short_topic == "status/working_status":
-            self.state.update_from_working_status(decoded)
+            self._update_from_working_status_broadcast(decoded)
         elif short_topic == "status/robot_base_status":
-            self.state.update_from_base_status(decoded)
+            self._update_from_base_status_broadcast(decoded)
         elif short_topic == "upgrade/upgrade_status":
             self.state.update_from_upgrade_status(decoded)
         elif short_topic == "status/download_status":
@@ -854,9 +926,9 @@ class NarwalClient:
                 continue
 
             if short_topic == "status/working_status":
-                self.state.update_from_working_status(decoded)
+                self._update_from_working_status_broadcast(decoded)
             elif short_topic == "status/robot_base_status":
-                self.state.update_from_base_status(decoded)
+                self._update_from_base_status_broadcast(decoded)
             elif short_topic == "upgrade/upgrade_status":
                 self.state.update_from_upgrade_status(decoded)
             elif short_topic == "status/download_status":
