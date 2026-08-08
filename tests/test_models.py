@@ -46,6 +46,23 @@ class TestNarwalState:
         assert state.working_status == WorkingStatus.UNKNOWN
         assert not state.has_recent_active_working_status
 
+    def test_zeroed_task_metrics_do_not_mark_cleaning(self) -> None:
+        """A zeroed session counter is not evidence of an active clean.
+
+        Field presence alone must not flip the entity to cleaning — a docked
+        robot reporting timeConsuming=0 would otherwise be shown as running.
+        """
+        state = NarwalState()
+        state.update_from_base_status({"3": {"1": 10, "10": 1}})
+        assert state.is_docked
+
+        state.update_from_working_status({"2": _float_to_uint32(0.0), "3": 0})
+
+        assert not state.has_recent_active_working_status
+        assert not state.is_cleaning
+        assert state.is_docked
+        assert state.working_status == WorkingStatus.DOCKED
+
     def test_working_status_clears_stale_dock_fields(self) -> None:
         """Fresh task metrics override stale dock indicators."""
         state = NarwalState(working_status=WorkingStatus.DOCKED)

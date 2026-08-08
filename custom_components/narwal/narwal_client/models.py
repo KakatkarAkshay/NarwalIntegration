@@ -696,18 +696,21 @@ class NarwalState:
         not area — reading it as area is why the sensor was stuck at 1.8 m².
         """
         self.raw_working_status = decoded
+        # Only a positive session counter is evidence of an active clean. Field
+        # presence alone is not: a robot reporting timeConsuming=0 would
+        # otherwise be flipped to CLEANING and shown as running while parked.
         active_payload = False
         if "3" in decoded:
             try:
                 self.cleaning_time = int(decoded["3"])
-                active_payload = True
+                active_payload = active_payload or self.cleaning_time > 0
             except (ValueError, TypeError):
                 pass
         if "2" in decoded:
             area = _to_float32(decoded["2"])
             if area is not None and area >= 0:
                 self.cleaning_area = area
-                active_payload = True
+                active_payload = active_payload or area > 0
         if "6" in decoded:
             # Field 6 = current target room_id (confirmed 2026-04-24 from live capture:
             # value changed 4→1 as robot moved from Corridor to Living Room).

@@ -194,6 +194,10 @@ class WorkingStatus(IntEnum):
     UNKNOWN = 0
     STANDBY = 1       # idle / transition state
     DOCKED_V2 = 2     # on dock (v01.07.23.00+ — replaces DOCKED=10/CHARGED=14 from older FW)
+    # UNCONFIRMED: reported as active cleaning on newer Flow 2 firmware in PR #63,
+    # but no capture has been supplied and PROTOCOL.md has no entry for 3. Treated
+    # as active because the #73 failure mode is showing "docked" during a clean;
+    # revisit if a capture shows 3 means something else (e.g. a self-test state).
     CLEANING_V2 = 3   # active cleaning on newer Flow 2 firmware
     CLEANING = 4      # active cleaning (stays 4 even while returning to dock)
     CLEANING_ALT = 5  # cleaning — observed when robot was physically stuck; may indicate error/stuck state
