@@ -172,6 +172,7 @@ class WorkingStatus(IntEnum):
     Values confirmed via live WebSocket monitoring:
       1  = STANDBY (idle, transition state between cleaning and docked)
       2  = DOCKED_V2 (on dock; confirmed v01.07.23.00 while charging at 10-36%)
+      3  = CLEANING_V2 (active cleaning; observed on newer Flow 2 firmware)
       4  = CLEANING (plan-based start; also stays 4 while returning to dock on older FW)
       5  = CLEANING_ALT (observed live: robot was physically stuck when reporting 5)
       7  = REMAPPING (live 2026-07-09: robot exploring/rebuilding the map; camera
@@ -193,6 +194,7 @@ class WorkingStatus(IntEnum):
     UNKNOWN = 0
     STANDBY = 1       # idle / transition state
     DOCKED_V2 = 2     # on dock (v01.07.23.00+ — replaces DOCKED=10/CHARGED=14 from older FW)
+    CLEANING_V2 = 3   # active cleaning on newer Flow 2 firmware
     CLEANING = 4      # active cleaning (stays 4 even while returning to dock)
     CLEANING_ALT = 5  # cleaning — observed when robot was physically stuck; may indicate error/stuck state
     REMAPPING = 7     # mapping/exploration (live 2026-07-09); camera active, take_picture accepted
@@ -202,6 +204,16 @@ class WorkingStatus(IntEnum):
     # PLACEHOLDER: error state value not yet observed live.
     # Trigger a real error (e.g., pick up robot mid-clean) to discover the value.
     ERROR = 99
+
+
+ACTIVE_CLEANING_STATUSES = frozenset(
+    {
+        WorkingStatus.CLEANING_V2,
+        WorkingStatus.CLEANING,
+        WorkingStatus.CLEANING_ALT,
+        WorkingStatus.REMAPPING,
+    }
+)
 
 
 class FanLevel(IntEnum):

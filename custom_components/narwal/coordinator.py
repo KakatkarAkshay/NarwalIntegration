@@ -21,7 +21,7 @@ from .narwal_client import (
     NarwalConnectionError,
     NarwalState,
 )
-from .narwal_client.const import WorkingStatus
+from .narwal_client.const import ACTIVE_CLEANING_STATUSES, WorkingStatus
 
 from .const import DOMAIN
 
@@ -107,7 +107,9 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
             _LOGGER.debug("Could not fetch device info at startup")
 
         try:
-            await self.client.get_status(full_update=True)
+            await self.client.get_status(
+                full_update=not self.client.state.has_recent_active_working_status
+            )
         except Exception:
             _LOGGER.debug("Could not fetch initial status")
 
@@ -178,7 +180,7 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
                 WorkingStatus.STANDBY, WorkingStatus.DOCKED_V2,
             )
             and self._prev_working_status
-            in (WorkingStatus.CLEANING, WorkingStatus.CLEANING_ALT)
+            in ACTIVE_CLEANING_STATUSES
         ):
             _LOGGER.info("Return-to-dock detected, refreshing dock status")
             self.hass.async_create_task(self._refresh_dock_status())
@@ -187,8 +189,13 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
         # display_map dropout recovery: if cleaning but no display_map for
         # 30s, re-send topic subscription. Only subscription — no wake burst
         # (wake bursts during cleaning cause pause bouncing).
-        is_cleaning = state.working_status in (
-            WorkingStatus.CLEANING, WorkingStatus.CLEANING_ALT,
+        is_cleaning = (
+            state.is_cleaning
+            or state.has_recent_active_working_status
+            or (
+                not state.is_docked
+                and state.working_status in ACTIVE_CLEANING_STATUSES
+            )
         )
         if is_cleaning:
             display_age = self.client.last_display_map_age
@@ -244,7 +251,9 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
     async def _refresh_dock_status(self) -> None:
         """Immediate get_status() after return-to-dock to refresh dock fields."""
         try:
-            await self.client.get_status(full_update=True)
+            await self.client.get_status(
+                full_update=not self.client.state.has_recent_active_working_status
+            )
             self.async_set_updated_data(self.client.state)
         except Exception:
             _LOGGER.debug("Failed to refresh dock status after transition")
@@ -262,7 +271,9 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
         try:
             if not self.client.connected:
                 raise NarwalConnectionError("Not connected")
-            await self.client.get_status(full_update=True)
+            await self.client.get_status(
+                full_update=not self.client.state.has_recent_active_working_status
+            )
         except Exception as err:
             self._consecutive_failures += 1
             if self._consecutive_failures >= self._max_failures:

@@ -28,7 +28,7 @@ class TestNarwalState:
         assert not state.is_returning
 
     def test_update_from_working_status(self) -> None:
-        """working_status topic sets cleaning metrics, not robot state."""
+        """working_status topic sets cleaning metrics and marks active cleaning."""
         state = NarwalState()
         # Field 2 = coveredArea (float32, m²); field 13 = totalDryStationBagTime, ignored.
         state.update_from_working_status(
@@ -36,8 +36,32 @@ class TestNarwalState:
         )
         assert state.cleaning_time == 120
         assert state.cleaning_area == 12.5
-        # working_status is NOT set by this method (comes from base_status)
+        assert state.working_status == WorkingStatus.CLEANING
+        assert state.has_recent_active_working_status
+
+    def test_working_status_station_timers_do_not_mark_cleaning(self) -> None:
+        """Station-only working_status timers are not active clean telemetry."""
+        state = NarwalState()
+        state.update_from_working_status({"13": 18000})
         assert state.working_status == WorkingStatus.UNKNOWN
+        assert not state.has_recent_active_working_status
+
+    def test_working_status_clears_stale_dock_fields(self) -> None:
+        """Fresh task metrics override stale dock indicators."""
+        state = NarwalState(working_status=WorkingStatus.DOCKED)
+        state.dock_sub_state = 1
+        state.dock_activity = 2
+        state.dock_field11 = 2
+        state.dock_field47 = 3
+
+        state.update_from_working_status({"3": 120})
+
+        assert state.is_cleaning
+        assert not state.is_docked
+        assert state.dock_sub_state == 0
+        assert state.dock_activity == 0
+        assert state.dock_field11 == 1
+        assert state.dock_field47 == 2
 
     def test_update_from_base_status_cleaning(self) -> None:
         state = NarwalState()
@@ -138,6 +162,14 @@ class TestNarwalState:
         })
         assert state.working_status == WorkingStatus.DOCKED_V2
         assert state.is_docked
+
+    def test_cleaning_v2_working_status(self) -> None:
+        """CLEANING_V2(3) on newer Flow 2 firmware maps to active cleaning."""
+        state = NarwalState()
+        state.update_from_base_status({"3": {"1": 3}, "11": 1, "47": 2})
+        assert state.working_status == WorkingStatus.CLEANING_V2
+        assert state.is_cleaning
+        assert not state.is_docked
 
     def test_new_fw_field3_unknown_subfields_logged(self) -> None:
         """New firmware sub-fields (4, 11) are parsed without error."""

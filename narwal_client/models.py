@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import struct
+import time
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -14,7 +15,15 @@ _LOGGER = logging.getLogger(__name__)
 # identical lines (#46). Warn once per distinct value instead.
 _WARNED_WORKING_STATUS: set[Any] = set()
 
-from .const import CommandResult, FanLevel, MopHumidity, WorkingStatus
+from .const import (
+    ACTIVE_CLEANING_STATUSES,
+    CommandResult,
+    FanLevel,
+    MopHumidity,
+    WorkingStatus,
+)
+
+_ACTIVE_WORKING_STATUS_TTL = 15.0
 
 
 @dataclass
@@ -495,6 +504,7 @@ class NarwalState:
     # Cleaning stats
     cleaning_area: float = 0.0  # m² (coveredArea)
     cleaning_time: int = 0  # seconds
+    last_active_working_status_time: float = 0.0
 
     # Consumables / station / fault (base_status; present on dock and during cleaning)
     dust_bag_health: float = 0.0  # field 35 stationBagHealthScore (%)
@@ -574,10 +584,26 @@ class NarwalState:
     raw_working_status: dict[str, Any] = field(default_factory=dict)
 
     @property
+    def has_recent_active_working_status(self) -> bool:
+        """True while live working_status task metrics are still fresh."""
+        if self.working_status not in ACTIVE_CLEANING_STATUSES:
+            return False
+        if self.last_active_working_status_time <= 0:
+            return False
+        return (
+            time.monotonic() - self.last_active_working_status_time
+            <= _ACTIVE_WORKING_STATUS_TTL
+        )
+
+    @property
     def is_cleaning(self) -> bool:
         """True when actively cleaning (not paused, not returning to dock)."""
+        if self.has_recent_active_working_status:
+            return not self.is_paused and not self.is_returning
+        if self.is_docked:
+            return False
         return (
-            self.working_status in (WorkingStatus.CLEANING, WorkingStatus.CLEANING_ALT)
+            self.working_status in ACTIVE_CLEANING_STATUSES
             and not self.is_paused
             and not self.is_returning_to_dock
         )
@@ -602,7 +628,9 @@ class NarwalState:
             WorkingStatus.DOCKED, WorkingStatus.CHARGED, WorkingStatus.DOCKED_V2,
         ):
             return True
-        if self.working_status in (WorkingStatus.CLEANING, WorkingStatus.CLEANING_ALT):
+        if self.has_recent_active_working_status:
+            return False
+        if self.working_status in ACTIVE_CLEANING_STATUSES:
             return False
         # For STANDBY, UNKNOWN, or any other status: check dock field signals.
         # Values differ across firmware versions:
@@ -635,9 +663,7 @@ class NarwalState:
         transitions to STANDBY/DOCKED/CHARGED, it has already docked
         even if field 3.7 is momentarily still set.
         """
-        if self.working_status not in (
-            WorkingStatus.CLEANING, WorkingStatus.CLEANING_ALT,
-        ):
+        if self.working_status not in ACTIVE_CLEANING_STATUSES:
             return False
         return self.is_returning_to_dock and self.dock_sub_state == 2
 
@@ -670,15 +696,18 @@ class NarwalState:
         not area — reading it as area is why the sensor was stuck at 1.8 m².
         """
         self.raw_working_status = decoded
+        active_payload = False
         if "3" in decoded:
             try:
                 self.cleaning_time = int(decoded["3"])
+                active_payload = True
             except (ValueError, TypeError):
                 pass
         if "2" in decoded:
             area = _to_float32(decoded["2"])
             if area is not None and area >= 0:
                 self.cleaning_area = area
+                active_payload = True
         if "6" in decoded:
             # Field 6 = current target room_id (confirmed 2026-04-24 from live capture:
             # value changed 4→1 as robot moved from Corridor to Living Room).
@@ -687,6 +716,16 @@ class NarwalState:
                 self.current_room_id = room_id if room_id != 0 else None
             except (ValueError, TypeError):
                 pass
+        if active_payload:
+            self.working_status = WorkingStatus.CLEANING
+            self.last_active_working_status_time = time.monotonic()
+            self.is_paused = False
+            self.is_returning_to_dock = False
+            self.dock_sub_state = 0
+            self.dock_activity = 0
+            self.dock_presence = 2
+            self.dock_field11 = 1
+            self.dock_field47 = 2
 
     def update_from_base_status(self, decoded: dict[str, Any]) -> None:
         """Update state from a decoded robot_base_status message.
@@ -752,6 +791,8 @@ class NarwalState:
                             raw_val,
                         )
                     self.working_status = WorkingStatus.UNKNOWN
+                if self.working_status not in ACTIVE_CLEANING_STATUSES:
+                    self.last_active_working_status_time = 0.0
             # Sub-field 2: paused overlay (0 or absent = not paused, 1 = paused)
             self.is_paused = bool(field3.get("2"))
             # Sub-field 7: returning to dock on old FW (value 1 = returning).
@@ -773,6 +814,17 @@ class NarwalState:
                     self.dock_presence = int(field3["3"])
                 except (ValueError, TypeError):
                     pass
+            if self.working_status in ACTIVE_CLEANING_STATUSES:
+                if "10" not in field3:
+                    self.dock_sub_state = 0
+                if "12" not in field3:
+                    self.dock_activity = 0
+                if "3" not in field3:
+                    self.dock_presence = 2
+                if "11" not in decoded:
+                    self.dock_field11 = 1
+                if "47" not in decoded:
+                    self.dock_field47 = 2
             # Log unrecognized sub-fields for future firmware mapping
             _known_f3 = {"1", "2", "3", "7", "10", "12"}
             _unknown_f3 = set(field3.keys()) - _known_f3
