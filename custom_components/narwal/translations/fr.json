@@ -145,6 +145,17 @@
       "dock_light": {
         "name": "Éclairage de la station"
       }
+    },
+    "switch": {
+      "show_room_labels": {
+        "name": "Afficher les noms des pièces"
+      },
+      "show_furniture": {
+        "name": "Afficher les meubles"
+      },
+      "show_furniture_labels": {
+        "name": "Afficher les noms des meubles"
+      }
     }
   }
 }

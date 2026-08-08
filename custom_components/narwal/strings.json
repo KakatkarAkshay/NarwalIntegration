@@ -148,6 +148,17 @@
       "dock_light": {
         "name": "Dock light"
       }
+    },
+    "switch": {
+      "show_room_labels": {
+        "name": "Show room labels"
+      },
+      "show_furniture": {
+        "name": "Show furniture"
+      },
+      "show_furniture_labels": {
+        "name": "Show furniture labels"
+      }
     }
   }
 }
