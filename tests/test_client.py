@@ -96,6 +96,25 @@ class TestNarwalClientInit:
             payload=b"\x08\x01",
         )
 
+    @pytest.mark.asyncio
+    async def test_device_info_updates_firmware_state(self) -> None:
+        """Device identity queries populate the firmware sensor state."""
+        client = NarwalClient("10.0.0.1")
+        response = CommandResponse(
+            data={
+                "1": b"hEA7OEshlx",
+                "2": b"0123456789abcdef0123456789abcdef",
+                "3": b"v01.13.11.02",
+            }
+        )
+
+        with patch.object(client, "send_command", new_callable=AsyncMock) as mock_send:
+            mock_send.return_value = response
+            info = await client.get_device_info()
+
+        assert info.firmware_version == "v01.13.11.02"
+        assert client.state.firmware_version == "v01.13.11.02"
+
 
 class TestBuildCleanPayloadV2:
     """Tests for the v2 clean payload schema introduced for firmware
