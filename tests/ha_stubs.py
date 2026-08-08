@@ -92,6 +92,9 @@ def install() -> None:
     # homeassistant.helpers (and sub-modules)
     ha_helpers = _mod("homeassistant.helpers", ha)
 
+    ha_entity = _mod("homeassistant.helpers.entity", ha_helpers)
+    ha_entity.EntityCategory = _EntityCategory  # type: ignore[attr-defined]
+
     ha_uc = _mod("homeassistant.helpers.update_coordinator", ha_helpers)
 
     class _DataUpdateCoordinator:
@@ -279,6 +282,29 @@ def install() -> None:
         device_class: object | None = None
 
     ha_bs.BinarySensorEntityDescription = _BinarySensorEntityDescription  # type: ignore[attr-defined]
+
+    ha_switch = _mod("homeassistant.components.switch", ha_comp)
+
+    class _SwitchEntity:
+        """Stub for SwitchEntity base class."""
+
+        def __init_subclass__(cls, **kw: object) -> None:
+            pass
+
+        def async_write_ha_state(self) -> None:
+            pass
+
+    @dataclass(frozen=True, kw_only=True)
+    class _SwitchEntityDescription:
+        """Stub for SwitchEntityDescription."""
+
+        key: str
+        name: str | None = None
+        translation_key: str | None = None
+        entity_category: object | None = None
+
+    ha_switch.SwitchEntity = _SwitchEntity  # type: ignore[attr-defined]
+    ha_switch.SwitchEntityDescription = _SwitchEntityDescription  # type: ignore[attr-defined]
 
     ha_cam = _mod("homeassistant.components.camera", ha_comp)
 

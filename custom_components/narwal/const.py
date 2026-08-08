@@ -34,7 +34,18 @@ PLATFORMS: list[Platform] = [
     Platform.CAMERA,
     Platform.SELECT,
     Platform.NUMBER,
+    Platform.SWITCH,
 ]
+
+CONF_SHOW_ROOM_LABELS = "show_room_labels"
+CONF_SHOW_FURNITURE = "show_furniture"
+CONF_SHOW_FURNITURE_LABELS = "show_furniture_labels"
+
+MAP_OPTION_DEFAULTS: dict[str, bool] = {
+    CONF_SHOW_ROOM_LABELS: True,
+    CONF_SHOW_FURNITURE: False,
+    CONF_SHOW_FURNITURE_LABELS: False,
+}
 
 # HA fan_speed labels → FanLevel, verbatim from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super powerful" and SUPER as "Ultra powerful".
 _FAN_SPEED_CANONICAL: dict[str, FanLevel] = {
