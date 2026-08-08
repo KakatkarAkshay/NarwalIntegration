@@ -118,10 +118,32 @@ Shipped in v1.0.2 ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) 
 Home Assistant's room cleaning targets **HA areas**, not the robot's own rooms, so there is a one-time mapping step. Without it the service fails with *"Area mapping is not configured for vacuum.&lt;entity&gt;"*.
 
 1. Create a Home Assistant **area** for each room you want to clean (Settings → Areas & Zones), if you don't already have one.
-2. Open the vacuum entity → settings, and map each robot segment to its area.
+2. Open the **mapping editor** and match each robot segment to its area (see below).
 3. `vacuum.clean_area` can then target those areas, and the robot cleans the matching rooms.
 
-Room names come from the robot's map — rooms you named in the Narwal app keep those names, and the rest use the shared room-type table corrected in [#48](https://github.com/sjmotew/NarwalIntegration/pull/48).
+#### Where the mapping editor lives
+
+It hangs off the **entity**, not the integration. There is **no such option on the integration page or the device page** — that is the most common place people look and it is not there.
+
+Any of these three routes opens the same editor:
+
+| Route | Where |
+|---|---|
+| **Entity settings** (most reliable) | Settings → Devices & Services → **Entities** tab → search your vacuum → open it → **cog icon** → *Map vacuum segments to areas* |
+| **First-run prompt** | Open the vacuum → **Clean areas** → **Configure** (only shown while no mapping exists, and only to admins) |
+| **Header action** | Open the vacuum → **Clean areas** → header action (use this one once a mapping already exists) |
+
+Home Assistant shows the option when the entity's domain is `vacuum` and it advertises the `CLEAN_AREA` feature. This integration sets that flag, so if the row is missing:
+
+- **Hard-refresh the browser** (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) — the frontend caches aggressively.
+- **Check the entity is not `unavailable`.** The row is gated on a live state object, so it will not render while the robot is unreachable.
+- Requires **Home Assistant 2026.3+**, when area mapping was introduced.
+
+Room names come from the robot's map — rooms you named in the Narwal app keep those names, and the rest use the shared room-type table corrected in [#48](https://github.com/sjmotew/NarwalIntegration/pull/48). **Name your rooms in the Narwal app before mapping**: the mapping keys on segment *id*, so renaming later is safe, but naming first means your HA areas, the robot's map and `sensor.current_room` all read the same words.
+
+`cleaning_area_id` accepts an **ordered list**, so you can clean several rooms in one job and the robot follows the order you picked.
+
+> **Remapping resets this.** A fresh full-house map in the Narwal app renumbers segments, which invalidates the mapping. The integration detects the change and raises a Home Assistant repair issue so you know to redo it.
 
 ## Requirements
 
@@ -135,7 +157,8 @@ Room names come from the robot's map — rooms you named in the Narwal app keep 
 - **Single connection** — close the Narwal app before using HA to avoid conflicts.
 - **Fan speed is set-only** — robot doesn't broadcast its current level.
 - **All cleaning requires the dock** — `clean/start_clean` returns `NOT_READY` if the robot is not docked when the command is sent. This applies to whole-house `vacuum.start` as well as room cleans.
-- **Room cleaning needs a segment-to-area mapping** — `vacuum.clean_area` targets Home Assistant *areas*, not robot rooms. Map the robot's segments to HA areas in the vacuum entity's settings first, or the service fails with "Area mapping is not configured". You need an HA area for each room you intend to clean.
+- **Room cleaning needs a segment-to-area mapping** — `vacuum.clean_area` targets Home Assistant *areas*, not robot rooms, and the mapping editor is on the **entity**, not the integration or device page. See [Room cleaning setup](#room-cleaning-setup-required-before-vacuumclean_area-works). Without it the service fails with "Area mapping is not configured".
+- **Only one floor at a time** — the integration uses the robot's *active* map, and never enumerates the others. On a multi-floor home only the rooms of the current map are visible to Home Assistant, and HA floors are not related to robot maps ([#43](https://github.com/sjmotew/NarwalIntegration/issues/43)).
 - **Map may be stale** — robot can return an old map. A new clean cycle typically refreshes it.
 
 ## Future Features (On Hold)

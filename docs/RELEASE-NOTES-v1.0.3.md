@@ -50,7 +50,9 @@ Not a code change, but it trips up every first-time user of room cleaning and is
 
 > `Area mapping is not configured for vacuum.<entity>. Configure the segment-to-area mapping before using this action`
 
-Configure it from the vacuum entity's settings in Home Assistant. You need an HA area for each room you intend to clean.
+The editor hangs off the **entity**, not the integration — there is no such option on the integration page or the device page, which is where most people look first. Reach it via **Settings → Devices & Services → Entities → your vacuum → cog icon → *Map vacuum segments to areas***, or from the vacuum's **Clean areas** view. You need an HA area for each room you intend to clean.
+
+`cleaning_area_id` takes an ordered list, so one call can clean several rooms in the order you choose. Note that remapping in the Narwal app renumbers segments and invalidates the mapping; the integration raises a repair issue when it detects the change.
 
 ---
 
