@@ -130,6 +130,19 @@ def install() -> None:
     ha_ep = _mod("homeassistant.helpers.entity_platform", ha_helpers)
     ha_ep.AddConfigEntryEntitiesCallback = MagicMock  # type: ignore[attr-defined]
 
+    ha_rs = _mod("homeassistant.helpers.restore_state", ha_helpers)
+
+    class _RestoreEntity:
+        """Stub for RestoreEntity."""
+
+        async def async_added_to_hass(self) -> None:
+            pass
+
+        async def async_get_last_state(self) -> None:
+            return None
+
+    ha_rs.RestoreEntity = _RestoreEntity  # type: ignore[attr-defined]
+
     # homeassistant.components.*
     ha_comp = _mod("homeassistant.components", ha)
 
@@ -187,6 +200,57 @@ def install() -> None:
             return 0
 
     ha_vac.VacuumEntityFeature = _VacuumEntityFeature  # type: ignore[attr-defined]
+
+    ha_select = _mod("homeassistant.components.select", ha_comp)
+
+    @dataclass(frozen=True, kw_only=True)
+    class _SelectEntityDescription:
+        """Stub for SelectEntityDescription (the EntityDescription fields our code sets)."""
+
+        key: str
+        name: str | None = None
+        translation_key: str | None = None
+        entity_category: object | None = None
+        options: list | None = None
+
+    ha_select.SelectEntityDescription = _SelectEntityDescription  # type: ignore[attr-defined]
+
+    class _SelectEntity:
+        """Stub for SelectEntity base class."""
+
+        def __init_subclass__(cls, **kw: object) -> None:
+            pass
+
+        def async_write_ha_state(self) -> None:
+            pass
+
+    ha_select.SelectEntity = _SelectEntity  # type: ignore[attr-defined]
+
+    ha_number = _mod("homeassistant.components.number", ha_comp)
+
+    class _NumberMode:
+        AUTO = "auto"
+        BOX = "box"
+        SLIDER = "slider"
+
+    ha_number.NumberMode = _NumberMode  # type: ignore[attr-defined]
+
+    class _RestoreNumber:
+        """Stub for RestoreNumber base class."""
+
+        def __init_subclass__(cls, **kw: object) -> None:
+            pass
+
+        async def async_added_to_hass(self) -> None:
+            pass
+
+        async def async_get_last_number_data(self) -> None:
+            return None
+
+        def async_write_ha_state(self) -> None:
+            pass
+
+    ha_number.RestoreNumber = _RestoreNumber  # type: ignore[attr-defined]
 
     ha_sensor = _mod("homeassistant.components.sensor", ha_comp)
     ha_sensor.SensorEntity = MagicMock  # type: ignore[attr-defined]

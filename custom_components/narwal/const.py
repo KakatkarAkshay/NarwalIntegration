@@ -2,7 +2,7 @@
 
 from homeassistant.const import Platform
 
-from .narwal_client import FanLevel
+from .narwal_client import FanLevel, MopHumidity, MopStrengthLevel, WorkMode
 
 DOMAIN = "narwal"
 DEFAULT_PORT = 9002
@@ -32,6 +32,8 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.CAMERA,
+    Platform.SELECT,
+    Platform.NUMBER,
 ]
 
 # HA fan_speed labels → FanLevel, verbatim from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super powerful" and SUPER as "Ultra powerful".
@@ -96,3 +98,23 @@ CONSUMABLE_REPLACE_ITEMS: dict[int, str] = {
 ERROR_HELP_URL_TEMPLATE = (
     "https://help.narwal.com/helpcenter/vall/#/p2/question/all?eType=1&code={code}&lang=en-US"
 )
+
+# Select option id → robot enum. Option ids are rendered to the app's user-visible labels via translations.
+WORK_MODE_MAP: dict[str, WorkMode] = {
+    "vacuum": WorkMode.VACUUM,
+    "mop": WorkMode.MOP,
+    "vacuum_then_mop": WorkMode.VACUUM_THEN_MOP,
+    "vacuum_and_mop": WorkMode.VACUUM_AND_MOP,
+}
+WATER_MAP: dict[str, MopHumidity] = {
+    "dry": MopHumidity.DRY,
+    "normal": MopHumidity.NORMAL,
+    "wet": MopHumidity.WET,
+}
+MOP_STRENGTH_MAP: dict[str, MopStrengthLevel] = {
+    "normal": MopStrengthLevel.NORMAL,
+    "high": MopStrengthLevel.HIGH,
+}
+
+PASSES_MIN = 1
+PASSES_MAX = 3
