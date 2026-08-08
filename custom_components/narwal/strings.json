@@ -140,6 +140,11 @@
       "passes": {
         "name": "Cleaning passes"
       }
+    },
+    "light": {
+      "dock_light": {
+        "name": "Dock light"
+      }
     }
   }
 }

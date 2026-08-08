@@ -140,6 +140,11 @@
       "passes": {
         "name": "Passages de nettoyage"
       }
+    },
+    "light": {
+      "dock_light": {
+        "name": "Éclairage de la station"
+      }
     }
   }
 }

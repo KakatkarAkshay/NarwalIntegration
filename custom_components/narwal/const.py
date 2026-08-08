@@ -2,7 +2,13 @@
 
 from homeassistant.const import Platform
 
-from .narwal_client import FanLevel, MopHumidity, MopStrengthLevel, WorkMode
+from .narwal_client import (
+    AmbientLightCtrlType,
+    FanLevel,
+    MopHumidity,
+    MopStrengthLevel,
+    WorkMode,
+)
 
 DOMAIN = "narwal"
 DEFAULT_PORT = 9002
@@ -35,6 +41,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.SWITCH,
+    Platform.LIGHT,
 ]
 
 CONF_SHOW_ROOM_LABELS = "show_room_labels"
@@ -45,6 +52,28 @@ MAP_OPTION_DEFAULTS: dict[str, bool] = {
     CONF_SHOW_ROOM_LABELS: True,
     CONF_SHOW_FURNITURE: False,
     CONF_SHOW_FURNITURE_LABELS: False,
+}
+
+CONF_DOCK_LIGHT_SUPPORTED = "dock_light_supported"
+
+DOCK_LIGHT_PRODUCT_KEYS = {"QxMSPG6VSO", "iSuVlI1If2"}
+
+
+def is_dock_light_supported(data: dict, options: dict | None = None) -> bool:
+    """Return whether this configured model exposes dock ambient lighting."""
+    if options and CONF_DOCK_LIGHT_SUPPORTED in options:
+        return bool(options[CONF_DOCK_LIGHT_SUPPORTED])
+    return data.get(CONF_PRODUCT_KEY) in DOCK_LIGHT_PRODUCT_KEYS
+
+
+DOCK_LIGHT_MODES: dict[str, AmbientLightCtrlType] = {
+    "Off": AmbientLightCtrlType.OFF,
+    "Fireplace": AmbientLightCtrlType.WINTER_WARMTH,
+    "Nightlight": AmbientLightCtrlType.NIGHT_LIGHT,
+    "Purple": AmbientLightCtrlType.PURPLE_LIGHT,
+}
+DOCK_LIGHT_MODE_NAMES: dict[int, str] = {
+    int(value): key for key, value in DOCK_LIGHT_MODES.items()
 }
 
 # HA fan_speed labels → FanLevel, verbatim from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super powerful" and SUPER as "Ultra powerful".

@@ -58,6 +58,9 @@ def install() -> None:
     # homeassistant.exceptions
     ha_exc = _mod("homeassistant.exceptions", ha)
     ha_exc.ConfigEntryNotReady = type("ConfigEntryNotReady", (Exception,), {})  # type: ignore[attr-defined]
+    ha_exc.HomeAssistantError = type(  # type: ignore[attr-defined]
+        "HomeAssistantError", (Exception,), {}
+    )
 
     # homeassistant.config_entries
     ha_ce = _mod("homeassistant.config_entries", ha)
@@ -321,3 +324,26 @@ def install() -> None:
             pass
 
     ha_cam.Camera = _Camera  # type: ignore[attr-defined]
+
+    ha_light = _mod("homeassistant.components.light", ha_comp)
+    ha_light.ATTR_EFFECT = "effect"  # type: ignore[attr-defined]
+    ha_light.DOMAIN = "light"  # type: ignore[attr-defined]
+
+    class _LightEntity:
+        """Stub for LightEntity base class."""
+
+        def __init_subclass__(cls, **kw: object) -> None:
+            pass
+
+        def async_write_ha_state(self) -> None:
+            pass
+
+    class _ColorMode:
+        ONOFF = "onoff"
+
+    class _LightEntityFeature:
+        EFFECT = 1
+
+    ha_light.LightEntity = _LightEntity  # type: ignore[attr-defined]
+    ha_light.ColorMode = _ColorMode  # type: ignore[attr-defined]
+    ha_light.LightEntityFeature = _LightEntityFeature  # type: ignore[attr-defined]

@@ -288,6 +288,19 @@ class TestNarwalState:
         assert state.maintain_items == []
         assert state.replace_items == []
 
+    def test_base_status_dock_light_mode(self) -> None:
+        """Field 50 exposes the base station ambient light mode."""
+        state = NarwalState()
+        state.update_from_base_status({"50": 2})
+        assert state.dock_light_mode == 2
+
+    def test_base_status_missing_dock_light_means_off(self) -> None:
+        """When the dock omits field 50, the ambient light is off."""
+        state = NarwalState()
+        state.update_from_base_status({"50": 2})
+        state.update_from_base_status({"2": _float_to_uint32(100.0)})
+        assert state.dock_light_mode == 0
+
     def test_update_from_upgrade_status(self) -> None:
         state = NarwalState()
         state.update_from_upgrade_status({

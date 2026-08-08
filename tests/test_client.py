@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from narwal_client.client import NarwalClient, NarwalConnectionError
-from narwal_client.const import CommandResult
+from narwal_client.const import AmbientLightCtrlType, CommandResult
 from narwal_client.models import CommandResponse, MapData, RoomInfo
 
 
@@ -42,6 +42,26 @@ class TestNarwalClientInit:
         client = NarwalClient("10.0.0.1")
         with pytest.raises(NarwalConnectionError):
             await client.send_raw("test/topic", b"\x08\x01")
+
+    @pytest.mark.asyncio
+    async def test_set_ambient_light_mode_accepts_applied(self) -> None:
+        """Dock light command accepts the observed applied result code."""
+        client = NarwalClient("10.0.0.1")
+        applied = CommandResponse(result_code=CommandResult.APPLIED)
+
+        with patch.object(
+            client, "send_command", new_callable=AsyncMock
+        ) as mock_send:
+            mock_send.return_value = applied
+            result = await client.set_ambient_light_mode(
+                AmbientLightCtrlType.NIGHT_LIGHT
+            )
+
+        assert result is applied
+        mock_send.assert_awaited_once_with(
+            "supply/ambient_light_ctrl",
+            payload=b"\x08\x01",
+        )
 
 
 class TestBuildCleanPayloadV2:
