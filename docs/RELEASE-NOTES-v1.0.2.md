@@ -79,7 +79,9 @@ It also means whole-house start cleans **every room**, rather than re-running wh
 
 ## Entity count
 
-You will see substantially more entities after upgrading — **up to 27**, from 9 in v1.0.0. New platforms: `select`, `number`, `switch`, `light`. Anything your model does not report stays unavailable rather than appearing with junk values, and `light.dock_light` is created only on models known to have a dock light.
+You will see substantially more entities after upgrading. New platforms: `select`, `number`, `switch`, `light`.
+
+Verified on a Flow (AX12, v01.08.03.07): **28 entities**, up from 9 on v1.0.1 — 1 vacuum, 9 sensors, 9 binary sensors, 2 cameras, 3 selects, 1 number, 3 switches. Models with a dock light get a 29th (`light.dock_light`); it is created only for product keys known to have one, so the Flow correctly does not get it.
 
 ---
 

@@ -38,7 +38,7 @@ A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant
 > - **Fan speed values will change** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)). The suction scale was off by one tier for this project's entire history. The list becomes the app's own labels — Quiet, Standard, Strong, Super powerful, Ultra powerful. Your existing `quiet` / `normal` / `strong` / `max` automations keep working as aliases, but they now map to the correct tier, so **actual suction may differ from what you were getting**.
 > - **`vacuum.start` will require the dock** ([#69](https://github.com/sjmotew/NarwalIntegration/issues/69)). Whole-house start now goes through `clean/start_clean` and cleans every room instead of re-running the robot's saved plan. That command only works from the dock, so starting off-dock now returns `NOT_READY` instead of appearing to succeed — a real failure surfacing, since the old path was not starting the clean either.
 >
-> You will also see **many more entities** — up to 27, from 9 — as clean settings, consumable alerts, map options and the dock light become HA entities.
+> You will also see **many more entities** — 28 on a Flow, up from 9 — as clean settings, consumable alerts, map options and the dock light become HA entities. Verified on hardware (AX12, v01.08.03.07).
 >
 > Release progress is tracked in [#66](https://github.com/sjmotew/NarwalIntegration/issues/66).
 
