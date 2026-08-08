@@ -71,6 +71,9 @@
           "fully_charged": "Fully Charged",
           "not_charging": "Not Charging"
         }
+      },
+      "current_room": {
+        "name": "Current room"
       }
     },
     "binary_sensor": {

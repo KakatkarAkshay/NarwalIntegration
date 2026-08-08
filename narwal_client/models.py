@@ -564,6 +564,11 @@ class NarwalState:
     # omits field 50 from base_status, so missing field 50 is treated as 0.
     dock_light_mode: int | None = None
 
+    # Current room being cleaned (working_status field 6, confirmed 2026-04-24).
+    # room_id of the room the robot is actively cleaning right now.
+    # None when robot is idle/docked or field 6 is absent/zero.
+    current_room_id: int | None = None
+
     # Raw data for fields we haven't fully decoded yet
     raw_base_status: dict[str, Any] = field(default_factory=dict)
     raw_working_status: dict[str, Any] = field(default_factory=dict)
@@ -636,6 +641,23 @@ class NarwalState:
             return False
         return self.is_returning_to_dock and self.dock_sub_state == 2
 
+    @property
+    def current_room_name(self) -> str | None:
+        """Return the display name of the room currently being cleaned.
+
+        Looks up current_room_id in the cached room table from get_map.
+        Returns None if the robot is idle, the map has not loaded yet,
+        or the room_id is not found in the map (e.g. during a partial map).
+        """
+        if self.current_room_id is None:
+            return None
+        if self.map_data is None:
+            return None
+        for room in self.map_data.rooms:
+            if room.room_id == self.current_room_id:
+                return room.display_name
+        return None
+
     def update_from_working_status(self, decoded: dict[str, Any]) -> None:
         """Update state from a decoded working_status message.
 
@@ -657,6 +679,14 @@ class NarwalState:
             area = _to_float32(decoded["2"])
             if area is not None and area >= 0:
                 self.cleaning_area = area
+        if "6" in decoded:
+            # Field 6 = current target room_id (confirmed 2026-04-24 from live capture:
+            # value changed 4→1 as robot moved from Corridor to Living Room).
+            try:
+                room_id = int(decoded["6"])
+                self.current_room_id = room_id if room_id != 0 else None
+            except (ValueError, TypeError):
+                pass
 
     def update_from_base_status(self, decoded: dict[str, Any]) -> None:
         """Update state from a decoded robot_base_status message.

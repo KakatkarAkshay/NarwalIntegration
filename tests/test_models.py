@@ -687,7 +687,133 @@ class TestParseObstacles:
         assert len(obstacles) == 1
         assert obstacles[0].type_id == 28
 
+class TestCurrentRoomTracking:
+    """Tests for current_room_id parsing and current_room_name lookup.
 
+    working_status field 6 confirmed 2026-04-24 from live Flow 2 capture:
+    value changed 4 (Corridor) → 1 (Living Room) as robot moved between rooms.
+    """
+
+    def test_current_room_id_from_working_status_field6(self) -> None:
+        """Field 6 in working_status sets current_room_id."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 4})
+        assert state.current_room_id == 4
+
+    def test_current_room_id_updates_as_robot_moves(self) -> None:
+        """current_room_id updates each time working_status arrives with field 6."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 4})
+        assert state.current_room_id == 4
+        state.update_from_working_status({"6": 1})
+        assert state.current_room_id == 1
+
+    def test_current_room_id_zero_becomes_none(self) -> None:
+        """Field 6 = 0 is treated as absent (no room)."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 0})
+        assert state.current_room_id is None
+
+    def test_current_room_id_not_cleared_when_field6_absent(self) -> None:
+        """If field 6 is not in the message, current_room_id is not cleared.
+
+        working_status messages without field 6 are routine (e.g. the idle
+        heartbeat only sends a few fields). We must not reset current_room_id
+        on every message — only update it when field 6 is explicitly present.
+        """
+        state = NarwalState()
+        state.update_from_working_status({"6": 4})
+        assert state.current_room_id == 4
+        # Message without field 6
+        state.update_from_working_status({"3": 120, "13": 18000})
+        assert state.current_room_id == 4  # unchanged
+
+    def test_current_room_id_default_is_none(self) -> None:
+        """Default state has no current room."""
+        state = NarwalState()
+        assert state.current_room_id is None
+
+    def test_current_room_name_returns_none_when_no_current_room(self) -> None:
+        """current_room_name is None when current_room_id is None."""
+        state = NarwalState()
+        assert state.current_room_name is None
+
+    def test_current_room_name_returns_none_when_no_map(self) -> None:
+        """current_room_name is None when map_data has not loaded yet."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 4})
+        assert state.map_data is None
+        assert state.current_room_name is None
+
+    def test_current_room_name_with_user_named_room(self) -> None:
+        """current_room_name returns user-assigned name for named rooms."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 3})
+        state.map_data = MapData(
+            rooms=[
+                RoomInfo(room_id=1, room_sub_type=3),     # Living Room
+                RoomInfo(room_id=3, name="Phoebe's room"),  # user-named
+            ],
+        )
+        assert state.current_room_name == "Phoebe's room"
+
+    def test_current_room_name_with_type_named_room(self) -> None:
+        """current_room_name falls back to room type name for unnamed rooms."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 1})
+        state.map_data = MapData(
+            rooms=[
+                RoomInfo(room_id=1, room_sub_type=3),  # type 3 = Living room
+                RoomInfo(room_id=3, name="Phoebe's room"),
+            ],
+        )
+        assert state.current_room_name == "Living room"
+
+    def test_current_room_name_with_numbered_room(self) -> None:
+        """current_room_name appends instance_index for duplicate room types."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 10})
+        state.map_data = MapData(
+            rooms=[
+                RoomInfo(room_id=7, room_sub_type=6, instance_index=1),   # Toilet
+                RoomInfo(room_id=10, room_sub_type=6, instance_index=2),  # Toilet 2
+                RoomInfo(room_id=11, room_sub_type=6, instance_index=3),  # Toilet 3
+            ],
+        )
+        assert state.current_room_name == "Toilet 2"
+
+    def test_current_room_name_unknown_room_id_returns_none(self) -> None:
+        """current_room_name returns None if room_id not found in map."""
+        state = NarwalState()
+        state.update_from_working_status({"6": 99})
+        state.map_data = MapData(
+            rooms=[RoomInfo(room_id=1, room_sub_type=3)],
+        )
+        assert state.current_room_name is None
+
+    def test_current_room_name_matches_live_capture(self) -> None:
+        """Simulate the 2026-04-24 live capture: room 4 = Corridor, room 1 = Living room.
+
+        Capture confirmed: field 6 changed from 4 to 1 as robot moved rooms.
+        Names follow the shared RoomType table corrected in #48.
+        """
+        state = NarwalState()
+        # Build room map from live get_map data
+        state.map_data = MapData(
+            rooms=[
+                RoomInfo(room_id=1, name="", room_sub_type=3),   # Living room (type 3)
+                RoomInfo(room_id=4, name="", room_sub_type=10),  # Corridor (type 10)
+            ],
+        )
+        # First capture: field 6 = 4 (Corridor)
+        state.update_from_working_status({"6": 4})
+        assert state.current_room_id == 4
+        assert state.current_room_name == "Corridor"
+
+        # Second capture 22 minutes later: field 6 = 1 (Living room)
+        state.update_from_working_status({"6": 1})
+        assert state.current_room_id == 1
+        assert state.current_room_name == "Living room"
 
 
 class TestRoomInfoNames:

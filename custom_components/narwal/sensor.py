@@ -98,6 +98,14 @@ SENSOR_DESCRIPTIONS: tuple[NarwalSensorEntityDescription, ...] = (
         # base_status field 15 terminateReason (TaskResult) — why the last task ended.
         value_fn=lambda state: TASK_RESULT_OPTIONS.get(state.terminate_reason),
     ),
+    NarwalSensorEntityDescription(
+        key="current_room",
+        translation_key="current_room",
+        icon="mdi:map-marker",
+        # working_status field 6: room_id of the room currently being cleaned.
+        # Resolved to a display name via the cached room map from get_map.
+        value_fn=lambda state: state.current_room_name,
+    ),
 )
 
 
