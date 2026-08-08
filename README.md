@@ -2,7 +2,7 @@
 
 A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant.io/) custom integration for Narwal robot vacuums. Communicates directly with your vacuum over your local network via WebSocket — no cloud account or internet connection required.
 
-> **Latest release: v1.0.1** (HACS) · **`master` is 33 commits ahead of it** — room cleaning, `vacuum.start`, and the frozen-state fix all landed there. v1.0.2 is being prepared; see [`docs/RELEASE-NOTES-v1.0.2.md`](docs/RELEASE-NOTES-v1.0.2.md).
+> **Latest release: v1.0.1** (HACS) · **`master` is 35 commits ahead of it** — room cleaning, `vacuum.start`, and the frozen-state fix all landed there. v1.0.2 is being prepared; see [`docs/RELEASE-NOTES-v1.0.2.md`](docs/RELEASE-NOTES-v1.0.2.md).
 
 > ### ✅ Room cleaning is fixed on `master`
 >
@@ -170,7 +170,7 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 **Where things stand — updated 2026-08-08.**
 
-`master` is 33 commits ahead of the v1.0.1 release, with **225 tests passing and CI green**, and has been verified running on a live Home Assistant instance. Everything below is merged; none of it has shipped to HACS yet. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
+`master` is 35 commits ahead of the v1.0.1 release, with **225 tests passing and CI green**, and has been verified running on a live Home Assistant instance. Everything below is merged; none of it has shipped to HACS yet. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
 
 | Merged since v1.0.1 | What it does |
 |---|---|

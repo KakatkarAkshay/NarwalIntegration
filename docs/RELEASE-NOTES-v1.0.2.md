@@ -2,7 +2,7 @@
 
 **Read the breaking changes before upgrading.** This release fixes the bug that made room cleaning silently do the wrong thing for this project's entire history, and correcting it changes room names, fan-speed tiers, and how `vacuum.start` behaves.
 
-33 commits since v1.0.1, drawn from four contributor forks. 225 tests passing, and the whole integration verified running on a live Home Assistant instance.
+35 commits since v1.0.1, drawn from four contributor forks. 225 tests passing, and the whole integration verified running on a live Home Assistant instance.
 
 ---
 
