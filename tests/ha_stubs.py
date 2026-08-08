@@ -95,8 +95,11 @@ def install() -> None:
     # homeassistant.helpers (and sub-modules)
     ha_helpers = _mod("homeassistant.helpers", ha)
 
+    # NOTE: deliberately does NOT expose EntityCategory. Real HA removed
+    # homeassistant.helpers.entity.EntityCategory; it lives in homeassistant.const.
+    # Stubbing both paths hid a real ImportError that only surfaced when the
+    # integration was loaded in Home Assistant (switch.py, from PR #62).
     ha_entity = _mod("homeassistant.helpers.entity", ha_helpers)
-    ha_entity.EntityCategory = _EntityCategory  # type: ignore[attr-defined]
 
     ha_uc = _mod("homeassistant.helpers.update_coordinator", ha_helpers)
 
