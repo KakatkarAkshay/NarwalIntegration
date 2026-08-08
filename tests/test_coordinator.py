@@ -7,6 +7,7 @@ UpdateFailed after the threshold, and resets counters on success/push.
 from __future__ import annotations
 
 import sys
+import time
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -16,7 +17,11 @@ import tests.ha_stubs  # noqa: E402
 
 tests.ha_stubs.install()
 
-from custom_components.narwal.coordinator import NarwalCoordinator  # noqa: E402
+from custom_components.narwal.coordinator import (
+    TOPIC_RESUBSCRIBE_AFTER,
+    TOPIC_SUBSCRIPTION_TTL,
+    NarwalCoordinator,
+)  # noqa: E402
 from custom_components.narwal.narwal_client import NarwalConnectionError, NarwalState  # noqa: E402
 
 UpdateFailed = sys.modules["homeassistant.helpers.update_coordinator"].UpdateFailed
@@ -50,6 +55,8 @@ class TestCoordinatorResilience:
         coordinator._listen_task = None
         coordinator._map_fetch_pending = False
         coordinator._last_display_map_resub = 0.0
+        # Fresh subscription so renewal does not fire in unrelated tests.
+        coordinator._last_topic_subscribe = time.monotonic()
         coordinator._prev_working_status = MagicMock()
         coordinator.update_interval = None
         # Prevent background task warnings
@@ -160,3 +167,89 @@ class TestCoordinatorResilience:
 
         assert result is coordinator.client.state
         assert coordinator._consecutive_failures == 1
+
+
+class TestTopicSubscriptionRenewal:
+    """The broadcast subscription must be renewed before it lapses (#73).
+
+    The robot only broadcasts status/working_status and display_map while an
+    active_robot_publish subscription is live, and that lasts 600 s. Observed on
+    hardware 2026-08-08 during a real room clean: with the subscription expired,
+    a 4000-line window carried 423 base_status broadcasts but exactly 1
+    working_status and 1 display_map. The vacuum entity sat at "docked" while the
+    robot was audibly cleaning, and the live map never moved. Re-subscribing
+    turned it straight back on — 211 / 30 / 30 over the next window.
+
+    The renewal must not be conditional on believing we are cleaning: working_status
+    is the signal that tells us we are cleaning, so gating renewal on it deadlocks.
+    """
+
+    def _coordinator(self, last_subscribe: float) -> NarwalCoordinator:
+        c = NarwalCoordinator.__new__(NarwalCoordinator)
+        c.hass = MagicMock()
+        c.config_entry = MagicMock()
+        c.client = MagicMock()
+        c.client.state = NarwalState()
+        c.client.connected = True
+        c.client.get_status = AsyncMock()
+        c.client.get_map = AsyncMock()
+        c.client.get_consumable_info = AsyncMock()
+        c.client.subscribe_to_topics = AsyncMock()
+        c.client.state.map_data = MagicMock()  # skip the map-retry branch
+        c._consecutive_failures = 0
+        c._max_failures = 5
+        c._consumable_poll_countdown = 99
+        c._fast_poll_remaining = 0
+        c._listen_task = None
+        c._map_fetch_pending = False
+        c._last_display_map_resub = 0.0
+        c._last_topic_subscribe = last_subscribe
+        c._prev_working_status = MagicMock()
+        c.update_interval = None
+        return c
+
+    @pytest.mark.asyncio
+    async def test_renews_when_subscription_is_stale(self) -> None:
+        """A poll past the renewal window re-sends the subscription."""
+        c = self._coordinator(time.monotonic() - (TOPIC_RESUBSCRIBE_AFTER + 30))
+        await c._async_update_data()
+        c.client.subscribe_to_topics.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_does_not_renew_while_subscription_is_fresh(self) -> None:
+        """A fresh subscription is not re-sent on every poll."""
+        c = self._coordinator(time.monotonic())
+        await c._async_update_data()
+        c.client.subscribe_to_topics.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_renewal_is_not_gated_on_cleaning_state(self) -> None:
+        """Renewal happens even when the entity believes the robot is docked.
+
+        This is the deadlock that caused #73: no subscription means no
+        working_status, which means the entity never leaves "docked", which — if
+        renewal were gated on cleaning — would mean the subscription is never
+        renewed.
+        """
+        c = self._coordinator(time.monotonic() - (TOPIC_RESUBSCRIBE_AFTER + 30))
+        c.client.state.update_from_base_status({"3": {"1": 10, "10": 1}})
+        assert c.client.state.is_docked
+        assert not c.client.state.is_cleaning
+
+        await c._async_update_data()
+
+        c.client.subscribe_to_topics.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_renewal_window_is_inside_the_ttl(self) -> None:
+        """Renew with margin — renewing at or after expiry would still drop frames."""
+        assert TOPIC_RESUBSCRIBE_AFTER < TOPIC_SUBSCRIPTION_TTL
+        assert TOPIC_RESUBSCRIBE_AFTER <= TOPIC_SUBSCRIPTION_TTL / 2
+
+    @pytest.mark.asyncio
+    async def test_renewal_failure_does_not_break_the_poll(self) -> None:
+        """A failed renewal must not take the whole update down."""
+        c = self._coordinator(time.monotonic() - (TOPIC_RESUBSCRIBE_AFTER + 30))
+        c.client.subscribe_to_topics = AsyncMock(side_effect=RuntimeError("ws closed"))
+        state = await c._async_update_data()
+        assert state is c.client.state

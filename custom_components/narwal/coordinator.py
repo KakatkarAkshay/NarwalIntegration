@@ -36,6 +36,14 @@ FAST_POLL_MAX = 6  # up to 60s of fast polling before falling back to normal
 # Consumable alerts change over weeks — poll every ~30 min (30 * POLL_INTERVAL).
 CONSUMABLE_POLL_EVERY = 30
 
+# The robot only broadcasts working_status and display_map while an
+# active_robot_publish subscription is live, and that subscription lasts
+# TOPIC_SUBSCRIPTION_TTL seconds. Renew well inside the window: once it lapses the
+# robot goes quiet on both topics, the vacuum entity freezes on its last
+# base_status-derived value, and the live map stops updating (#73).
+TOPIC_SUBSCRIPTION_TTL = 600.0
+TOPIC_RESUBSCRIBE_AFTER = 240.0
+
 
 @dataclass
 class CleanSettings:
@@ -86,6 +94,7 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
         self._prev_working_status = WorkingStatus.UNKNOWN
         self._map_fetch_pending = False
         self._last_display_map_resub: float = 0.0
+        self._last_topic_subscribe: float = 0.0
         self._consecutive_failures = 0
         self._max_failures = 5  # 5 * 60s = 5 minutes before entities go unavailable
         self._consumable_poll_countdown = 0  # 0 = fetch on next poll, then every CONSUMABLE_POLL_EVERY
@@ -127,6 +136,7 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
         # Must be sent before listener starts so display_map flows during cleaning.
         try:
             await self.client.subscribe_to_topics()
+            self._last_topic_subscribe = time.monotonic()
         except Exception:
             _LOGGER.debug("Could not send topic subscription at startup")
 
@@ -237,6 +247,7 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
             return
         try:
             await self.client.subscribe_to_topics()
+            self._last_topic_subscribe = time.monotonic()
         except Exception:
             _LOGGER.debug("Topic subscription failed after map load")
         self.async_set_updated_data(self.client.state)
@@ -245,6 +256,7 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
         """Re-send topic subscription to recover display_map during cleaning."""
         try:
             await self.client.subscribe_to_topics()
+            self._last_topic_subscribe = time.monotonic()
         except Exception:
             _LOGGER.debug("Topic re-subscription failed")
 
@@ -294,6 +306,19 @@ class NarwalCoordinator(DataUpdateCoordinator[NarwalState]):
                 await self.client.get_map()
             except Exception:
                 pass
+
+        # Renew the broadcast subscription before it lapses. This is deliberately
+        # NOT conditional on believing we are cleaning: working_status is what tells
+        # us we are cleaning, so gating renewal on that state deadlocks — the
+        # subscription expires, the robot goes quiet, the entity stays "docked", and
+        # nothing ever re-subscribes (#73).
+        if time.monotonic() - self._last_topic_subscribe > TOPIC_RESUBSCRIBE_AFTER:
+            try:
+                await self.client.subscribe_to_topics()
+                self._last_topic_subscribe = time.monotonic()
+                _LOGGER.debug("Renewed topic subscription")
+            except Exception:
+                _LOGGER.debug("Topic subscription renewal failed")
 
         # Refresh consumable alerts periodically (slow-changing; not broadcast)
         if self._consumable_poll_countdown <= 0:
