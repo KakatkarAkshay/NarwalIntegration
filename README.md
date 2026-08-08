@@ -2,9 +2,9 @@
 
 A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant.io/) custom integration for Narwal robot vacuums. Communicates directly with your vacuum over your local network via WebSocket — no cloud account or internet connection required.
 
-> **Latest release: [v1.0.2](https://github.com/sjmotew/NarwalIntegration/releases/tag/v1.0.2)** (HACS) — room cleaning finally works. **[Read the three breaking changes](docs/RELEASE-NOTES-v1.0.2.md) before upgrading.**
+> **Latest release: [v1.0.3](https://github.com/sjmotew/NarwalIntegration/releases/tag/v1.0.3)** (HACS) — room cleaning works and the vacuum entity tracks it live. **Coming from v1.0.1 or earlier? [Read the three breaking changes](docs/RELEASE-NOTES-v1.0.2.md) first.** On v1.0.2? [Upgrade](docs/RELEASE-NOTES-v1.0.3.md) — v1.0.2 froze at `docked` mid-clean.
 
-> ### ✅ Room cleaning is fixed — shipped in v1.0.2
+> ### ✅ Room cleaning is fixed — shipped in v1.0.2, verified on hardware in v1.0.3
 >
 > Community reverse-engineering found that **room-specific cleaning had never worked**. The integration sent clean commands to `clean/plan/start`, which is `StartWithPlan{planId, mapId}` — it runs the plan stored in the Narwal app and **discards the rooms we send**, while still returning success. That is why every previous fix appeared to work and changed nothing. `clean/start_clean` is the correct command.
 >
@@ -27,7 +27,7 @@ A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant
 >
 > You will also see **many more entities** — 28 on a Flow, up from 9 — as clean settings, consumable alerts, map options and the dock light become HA entities. Verified on hardware (AX12, v01.08.03.07).
 >
-> **One fix still needs confirmation:** the frozen-`docked` state ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) is fixed in v1.0.2 but does not reproduce on the development unit, so it ships unvalidated. If your vacuum entity used to stick at `docked` mid-clean, please report on [#73](https://github.com/sjmotew/NarwalIntegration/issues/73).
+> **Fixed in v1.0.3:** the vacuum entity used to freeze at `docked` mid-clean, with the live map stuck and `cleaning_area` / `cleaning_time` never populating ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)). The robot only broadcasts `working_status` and `display_map` while a subscription is live, that subscription expires after 600 s, and nothing renewed it. Reproduced and fixed on hardware during a real room clean. **v1.0.2 does not contain this fix.**
 
 ## Device Compatibility
 
@@ -56,7 +56,7 @@ Models marked **Not Compatible** use a different protocol or are cloud-only. Thi
 - **Start / Stop / Pause / Resume** — validated on hardware (see the note above for `start` on newer Flow firmware)
 - **Return to dock** / **Locate** (robot announces "Robot is here")
 - **Fan speed** — Quiet, Standard, Strong, Super powerful, Ultra powerful (set-only; robot doesn't broadcast current level). On v1.0.1 these are `quiet` / `normal` / `strong` / `max` and are off by one tier — see the breaking-change note above
-- **Room-specific cleaning** — exposed in the HA UI (requires HA 2026.3+). **Fixed in v1.0.2** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)); broken in v1.0.1 and earlier
+- **Room-specific cleaning** — exposed in the HA UI (requires HA 2026.3+ and a segment-to-area mapping, see Known Limitations). **Fixed in v1.0.2** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)); broken in v1.0.1 and earlier
 
 ### Clean Settings
 Shipped in v1.0.2 ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) — applied to both room and whole-house cleans, which previously hardcoded max suction / wet mop / single pass:
@@ -113,6 +113,16 @@ Shipped in v1.0.2 ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) 
 
 > **Tip:** Assign a static IP to your vacuum in your router.
 
+### Room cleaning setup (required before `vacuum.clean_area` works)
+
+Home Assistant's room cleaning targets **HA areas**, not the robot's own rooms, so there is a one-time mapping step. Without it the service fails with *"Area mapping is not configured for vacuum.&lt;entity&gt;"*.
+
+1. Create a Home Assistant **area** for each room you want to clean (Settings → Areas & Zones), if you don't already have one.
+2. Open the vacuum entity → settings, and map each robot segment to its area.
+3. `vacuum.clean_area` can then target those areas, and the robot cleans the matching rooms.
+
+Room names come from the robot's map — rooms you named in the Narwal app keep those names, and the rest use the shared room-type table corrected in [#48](https://github.com/sjmotew/NarwalIntegration/pull/48).
+
 ## Requirements
 
 - Narwal vacuum on the same local network as Home Assistant
@@ -125,7 +135,7 @@ Shipped in v1.0.2 ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) 
 - **Single connection** — close the Narwal app before using HA to avoid conflicts.
 - **Fan speed is set-only** — robot doesn't broadcast its current level.
 - **All cleaning requires the dock** — `clean/start_clean` returns `NOT_READY` if the robot is not docked when the command is sent. This applies to whole-house `vacuum.start` as well as room cleans.
-- **Vacuum state freeze is fixed but unconfirmed** — the fix for [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) shipped in v1.0.2, but the bug does not reproduce on the development unit, so it has not been validated on affected hardware. Reports welcome.
+- **Room cleaning needs a segment-to-area mapping** — `vacuum.clean_area` targets Home Assistant *areas*, not robot rooms. Map the robot's segments to HA areas in the vacuum entity's settings first, or the service fails with "Area mapping is not configured". You need an HA area for each room you intend to clean.
 - **Map may be stale** — robot can return an old map. A new clean cycle typically refreshes it.
 
 ## Future Features (On Hold)
@@ -155,16 +165,17 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 ## Project Status
 
-**Where things stand — updated 2026-08-08, at the v1.0.2 release.**
+**Where things stand — updated 2026-08-08, at the v1.0.3 release.**
 
-**v1.0.2 is released** — everything below is shipped to HACS. 225 tests passing, CI green, and the integration verified running on a live Home Assistant instance before tagging. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
+**v1.0.3 is released** — everything below is shipped to HACS. 230 tests passing, CI green, and the integration verified on a live Home Assistant instance driving a real room clean end to end. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
 
 | Merged since v1.0.1 | What it does |
 |---|---|
 | [#49](https://github.com/sjmotew/NarwalIntegration/pull/49) | **Room cleaning via `clean/start_clean`** — the headline fix. Closes [#37](https://github.com/sjmotew/NarwalIntegration/issues/37) |
 | [#48](https://github.com/sjmotew/NarwalIntegration/pull/48) | Room-type names taken from the app's own strings. Closes [#22](https://github.com/sjmotew/NarwalIntegration/issues/22) |
 | [#50](https://github.com/sjmotew/NarwalIntegration/pull/50) | Clean settings as HA entities — work mode, water, mop strength, passes |
-| [#63](https://github.com/sjmotew/NarwalIntegration/pull/63) | Live state from `working_status`, so the entity stops freezing at `docked` ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) |
+| [#63](https://github.com/sjmotew/NarwalIntegration/pull/63) | Interprets live `working_status` telemetry rather than a stale `base_status` |
+| [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) | **v1.0.3** — renews the broadcast subscription before it lapses, so `working_status` and `display_map` keep arriving and the entity stops freezing at `docked` |
 | [#62](https://github.com/sjmotew/NarwalIntegration/pull/62) | Map rendering options as switches — room labels, furniture, furniture labels |
 | [#61](https://github.com/sjmotew/NarwalIntegration/pull/61) | Dock ambient light entity, on models that have one |
 | [#24](https://github.com/sjmotew/NarwalIntegration/pull/24) | `sensor.current_room` — the room being cleaned right now |
@@ -179,8 +190,7 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 ### Next steps
 
-1. **Confirm the [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) fix on affected hardware** — it does not reproduce on the development unit, so it shipped unvalidated. This is the top open question in v1.0.2.
-2. **Local discovery** ([#35](https://github.com/sjmotew/NarwalIntegration/pull/35)) — zeroconf and DHCP discovery is the largest outstanding UX win, since [#40](https://github.com/sjmotew/NarwalIntegration/issues/40) shows setup failing outright on the wake timeout. Awaiting a narrowed PR.
+1. **Local discovery** ([#35](https://github.com/sjmotew/NarwalIntegration/pull/35)) — zeroconf and DHCP discovery is the largest outstanding UX win, since [#40](https://github.com/sjmotew/NarwalIntegration/issues/40) shows setup failing outright on the wake timeout. Awaiting a narrowed PR.
 
 ### Open protocol questions — help wanted
 

@@ -1,5 +1,15 @@
 # v1.0.2 — Room cleaning actually works
 
+> ## ⚠️ Superseded in part by [v1.0.3](RELEASE-NOTES-v1.0.3.md)
+>
+> The "Needs confirmation" section below was **wrong**. The frozen-`docked` bug
+> ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) *does* reproduce, reliably —
+> the probe behind that claim only watched the robot while docked, and the bug only appears
+> during a clean. The real root cause was a broadcast subscription that expired after 600 s and
+> was never renewed. **[v1.0.3](RELEASE-NOTES-v1.0.3.md) fixes it; upgrade past v1.0.2.**
+>
+> Everything else in these notes stands, including the three breaking changes.
+
 **Read the breaking changes before upgrading.** This release fixes the bug that made room cleaning silently do the wrong thing for this project's entire history, and correcting it changes room names, fan-speed tiers, and how `vacuum.start` behaves.
 
 35 commits since v1.0.1, drawn from four contributor forks. 225 tests passing, and the whole integration verified running on a live Home Assistant instance.
@@ -87,11 +97,11 @@ Verified on a Flow (AX12, v01.08.03.07): **28 entities**, up from 9 on v1.0.1 �
 
 ## Needs confirmation
 
-**The frozen-state fix ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) is unvalidated on affected hardware and the issue stays open.**
+**Corrected after release: this section was wrong. See [v1.0.3](RELEASE-NOTES-v1.0.3.md).**
 
-The bug does not reproduce on the development unit — a 150-second listen on a Flow (AX12, v01.08.03.07) showed `robot_base_status` arriving every ~1.5 s while docked, so the entity never freezes there. The fix is correct against the described root cause, but nobody has yet confirmed it on a robot that exhibits the freeze.
+This release claimed the frozen-state bug ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) "does not reproduce on the development unit," based on a 150-second listen that showed `robot_base_status` arriving every ~1.5 s. That listen only watched the robot **while docked**. The bug appears only *during* a clean, and it reproduced on the development unit the first time a room clean was run against it.
 
-If your vacuum entity used to stick at `docked` mid-clean, please report on [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) whether v1.0.2 fixes it.
+The real cause was a broadcast subscription that expires after 600 s and was never renewed, which stopped `working_status` and `display_map` from arriving at all. The #63 work shipped here interprets that telemetry; it could not help while the telemetry was absent. **v1.0.3 keeps the subscription alive and closes #73.**
 
 One related value is also unconfirmed: `working_status = 3` is treated as active cleaning on newer Flow 2 firmware, on a report without a supporting capture. It is marked `UNCONFIRMED` in the source.
 
