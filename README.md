@@ -2,9 +2,9 @@
 
 A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant.io/) custom integration for Narwal robot vacuums. Communicates directly with your vacuum over your local network via WebSocket — no cloud account or internet connection required.
 
-> **Latest release: v1.0.1** (HACS) · **`master` is 35 commits ahead of it** — room cleaning, `vacuum.start`, and the frozen-state fix all landed there. v1.0.2 is being prepared; see [`docs/RELEASE-NOTES-v1.0.2.md`](docs/RELEASE-NOTES-v1.0.2.md).
+> **Latest release: [v1.0.2](https://github.com/sjmotew/NarwalIntegration/releases/tag/v1.0.2)** (HACS) — room cleaning finally works. **[Read the three breaking changes](docs/RELEASE-NOTES-v1.0.2.md) before upgrading.**
 
-> ### ✅ Room cleaning is fixed on `master`
+> ### ✅ Room cleaning is fixed — shipped in v1.0.2
 >
 > Community reverse-engineering found that **room-specific cleaning had never worked**. The integration sent clean commands to `clean/plan/start`, which is `StartWithPlan{planId, mapId}` — it runs the plan stored in the Narwal app and **discards the rooms we send**, while still returning success. That is why every previous fix appeared to work and changed nothing. `clean/start_clean` is the correct command.
 >
@@ -17,30 +17,17 @@ A fully **local, cloud-independent** [Home Assistant](https://www.home-assistant
 > | [@shin906710](https://github.com/sjmotew/NarwalIntegration/issues/70) | Freo Z10 Pro (AX26) | v01.02.00.15 | Two single-room cleans, each cleaned only the selected room |
 > | [@Zebble](https://github.com/sjmotew/NarwalIntegration/pull/49) | Flow (AX12) | v01.08.03.07 | Two rooms, correct rooms, correct order, first attempt, ~35 min run |
 >
-> ### ⚠️ Still broken in the released v1.0.1
->
-> If you installed from HACS, you are on v1.0.1 and these still apply:
->
-> | Issue | Impact | Fixed by |
-> |---|---|---|
-> | **Room cleaning ignores your selection** | The robot cleans its last plan or your first Narwal-app shortcut instead of the rooms you picked. On **Flow 2** it can also clear the map stored on the robot ([#55](https://github.com/sjmotew/NarwalIntegration/issues/55)) | [#49](https://github.com/sjmotew/NarwalIntegration/pull/49) — on `master` |
-> | **Wrong room type labels** | Unnamed rooms show incorrect types on all models — the lookup table is misaligned from index 5, so a bathroom may display as "Study". Rooms you named in the Narwal app are unaffected | [#48](https://github.com/sjmotew/NarwalIntegration/pull/48) — on `master` |
-> | **`vacuum.start` silently no-ops** | On newer firmware, whole-house start reports success and does nothing | [#69](https://github.com/sjmotew/NarwalIntegration/issues/69) — fixed on `master` |
-> | **Vacuum state freezes at `docked`** | The entity holds its last state while the robot is demonstrably cleaning; sensors keep updating | [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) — fixed on `master`, awaiting field confirmation |
->
-> **Want the fixes now?** Install from the `master` branch instead of the HACS release. Otherwise wait for v1.0.2.
->
-> ### 🔜 Coming in v1.0.2 — three breaking changes
+> ### ⚠️ Upgrading from v1.0.1 — three breaking changes
 >
 > Full notes: [`docs/RELEASE-NOTES-v1.0.2.md`](docs/RELEASE-NOTES-v1.0.2.md). Read this before upgrading:
 >
-> - **Room names will change** ([#48](https://github.com/sjmotew/NarwalIntegration/pull/48)). The room-type table was wrong for every model. If you built automations or scripts on the old (incorrect) names, expect to redo those mappings.
-> - **Fan speed values will change** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)). The suction scale was off by one tier for this project's entire history. The list becomes the app's own labels — Quiet, Standard, Strong, Super powerful, Ultra powerful. Your existing `quiet` / `normal` / `strong` / `max` automations keep working as aliases, but they now map to the correct tier, so **actual suction may differ from what you were getting**.
-> - **`vacuum.start` will require the dock** ([#69](https://github.com/sjmotew/NarwalIntegration/issues/69)). Whole-house start now goes through `clean/start_clean` and cleans every room instead of re-running the robot's saved plan. That command only works from the dock, so starting off-dock now returns `NOT_READY` instead of appearing to succeed — a real failure surfacing, since the old path was not starting the clean either.
+> - **Room names changed** ([#48](https://github.com/sjmotew/NarwalIntegration/pull/48)). The room-type table was wrong for every model. If you built automations or scripts on the old (incorrect) names, expect to redo those mappings.
+> - **Fan speed values and tiers changed** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)). The suction scale was off by one tier for this project's entire history. The list is now the app's own labels — Quiet, Standard, Strong, Super powerful, Ultra powerful. Your existing `quiet` / `normal` / `strong` / `max` automations keep working as aliases, but they now map to the correct tier, so **actual suction may differ from what you were getting**.
+> - **`vacuum.start` now requires the dock** ([#69](https://github.com/sjmotew/NarwalIntegration/issues/69)). Whole-house start goes through `clean/start_clean` and cleans every room instead of re-running the robot's saved plan. That command only works from the dock, so starting off-dock now returns `NOT_READY` instead of appearing to succeed — a real failure surfacing, since the old path was not starting the clean either.
 >
 > You will also see **many more entities** — 28 on a Flow, up from 9 — as clean settings, consumable alerts, map options and the dock light become HA entities. Verified on hardware (AX12, v01.08.03.07).
 >
-> Release progress is tracked in [#66](https://github.com/sjmotew/NarwalIntegration/issues/66).
+> **One fix still needs confirmation:** the frozen-`docked` state ([#73](https://github.com/sjmotew/NarwalIntegration/issues/73)) is fixed in v1.0.2 but does not reproduce on the development unit, so it ships unvalidated. If your vacuum entity used to stick at `docked` mid-clean, please report on [#73](https://github.com/sjmotew/NarwalIntegration/issues/73).
 
 ## Device Compatibility
 
@@ -69,10 +56,10 @@ Models marked **Not Compatible** use a different protocol or are cloud-only. Thi
 - **Start / Stop / Pause / Resume** — validated on hardware (see the note above for `start` on newer Flow firmware)
 - **Return to dock** / **Locate** (robot announces "Robot is here")
 - **Fan speed** — Quiet, Standard, Strong, Super powerful, Ultra powerful (set-only; robot doesn't broadcast current level). On v1.0.1 these are `quiet` / `normal` / `strong` / `max` and are off by one tier — see the breaking-change note above
-- **Room-specific cleaning** — exposed in the HA UI (requires HA 2026.3+). **Fixed on `master`** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)); broken in v1.0.1
+- **Room-specific cleaning** — exposed in the HA UI (requires HA 2026.3+). **Fixed in v1.0.2** ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)); broken in v1.0.1 and earlier
 
 ### Clean Settings
-On `master` ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) — applied to both room and whole-house cleans, which previously hardcoded max suction / wet mop / single pass:
+Shipped in v1.0.2 ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) — applied to both room and whole-house cleans, which previously hardcoded max suction / wet mop / single pass:
 - **Work mode** — vacuum, mop, vacuum then mop, vacuum and mop
 - **Water level** — dry, normal, wet
 - **Mop strength** — normal, high
@@ -82,21 +69,21 @@ On `master` ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) — ap
 - Battery level, cleaning time, firmware version
 - Docked status (binary sensor), charging state (Charging / Fully Charged / Not Charging)
 - Cleaning area — reports real covered area as of v1.0.1 ([#51](https://github.com/sjmotew/NarwalIntegration/pull/51))
-- Current room being cleaned ([#24](https://github.com/sjmotew/NarwalIntegration/pull/24), on `master`)
-- Last clean result — why the previous task ended ([#53](https://github.com/sjmotew/NarwalIntegration/pull/53), on `master`)
-- Dust bag health and detergent remaining ([#52](https://github.com/sjmotew/NarwalIntegration/pull/52), on `master`)
-- Station and consumable binary sensors — clean water tank, sewage tank, dust box, dust bag, station bag, error ([#52](https://github.com/sjmotew/NarwalIntegration/pull/52), on `master`)
-- Maintenance and replacement alerts, with the affected parts listed as attributes ([#54](https://github.com/sjmotew/NarwalIntegration/pull/54), on `master`)
+- Current room being cleaned ([#24](https://github.com/sjmotew/NarwalIntegration/pull/24), v1.0.2)
+- Last clean result — why the previous task ended ([#53](https://github.com/sjmotew/NarwalIntegration/pull/53), v1.0.2)
+- Dust bag health and detergent remaining ([#52](https://github.com/sjmotew/NarwalIntegration/pull/52), v1.0.2)
+- Station and consumable binary sensors — clean water tank, sewage tank, dust box, dust bag, station bag, error ([#52](https://github.com/sjmotew/NarwalIntegration/pull/52), v1.0.2)
+- Maintenance and replacement alerts, with the affected parts listed as attributes ([#54](https://github.com/sjmotew/NarwalIntegration/pull/54), v1.0.2)
 
 ### Live Map
 - Color-coded floor plan with room labels (all rooms — user-named and auto-generated)
 - Furniture/obstacle overlay from the robot's stored map data
 - Dock marker and live robot trail during cleaning (~1.5s refresh)
-- Carpet-map debug image as a second camera ([#67](https://github.com/sjmotew/NarwalIntegration/pull/67), on `master`)
-- Display toggles for room labels, furniture and furniture labels ([#62](https://github.com/sjmotew/NarwalIntegration/pull/62), on `master`)
+- Carpet-map debug image as a second camera ([#67](https://github.com/sjmotew/NarwalIntegration/pull/67), v1.0.2)
+- Display toggles for room labels, furniture and furniture labels ([#62](https://github.com/sjmotew/NarwalIntegration/pull/62), v1.0.2)
 
 ### Dock
-- **Ambient light** — off, fireplace, nightlight, purple, on models with a dock light ([#61](https://github.com/sjmotew/NarwalIntegration/pull/61), on `master`)
+- **Ambient light** — off, fireplace, nightlight, purple, on models with a dock light ([#61](https://github.com/sjmotew/NarwalIntegration/pull/61), v1.0.2)
 
 ### Connectivity
 - Real-time WebSocket push updates
@@ -138,7 +125,7 @@ On `master` ([#50](https://github.com/sjmotew/NarwalIntegration/pull/50)) — ap
 - **Single connection** — close the Narwal app before using HA to avoid conflicts.
 - **Fan speed is set-only** — robot doesn't broadcast its current level.
 - **All cleaning requires the dock** — `clean/start_clean` returns `NOT_READY` if the robot is not docked when the command is sent. This applies to whole-house `vacuum.start` as well as room cleans.
-- **Vacuum state freeze is fixed but unconfirmed** — the fix for [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) is on `master`, but the bug does not reproduce on the development unit, so it has not been validated on affected hardware. Reports welcome.
+- **Vacuum state freeze is fixed but unconfirmed** — the fix for [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) shipped in v1.0.2, but the bug does not reproduce on the development unit, so it has not been validated on affected hardware. Reports welcome.
 - **Map may be stale** — robot can return an old map. A new clean cycle typically refreshes it.
 
 ## Future Features (On Hold)
@@ -159,7 +146,7 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 | Problem | Solution |
 |---------|----------|
 | "Cannot connect" during setup | Verify IP and that port 9002 is reachable. If it still fails, **open the Narwal app on your phone the moment you press Submit** — a sleeping robot may not answer within the setup timeout ([#40](https://github.com/sjmotew/NarwalIntegration/issues/40)). |
-| Room cleaning runs the wrong rooms | Fixed on `master` ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)). If you are on the v1.0.1 HACS release, this is expected — install from `master` or wait for v1.0.2. |
+| Room cleaning runs the wrong rooms | Fixed in v1.0.2 ([#49](https://github.com/sjmotew/NarwalIntegration/pull/49)). If you are still on v1.0.1 or earlier this is expected — upgrade. |
 | Room clean returns `NOT_READY` | `clean/start_clean` only works from the dock. Send the robot home first, then start the room clean. |
 | Entities show "Unavailable" | Robot may be asleep. Open Narwal app briefly to wake it. |
 | Map not showing | Map loads after robot wakes. A new clean refreshes a stale map. |
@@ -168,9 +155,9 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 ## Project Status
 
-**Where things stand — updated 2026-08-08.**
+**Where things stand — updated 2026-08-08, at the v1.0.2 release.**
 
-`master` is 35 commits ahead of the v1.0.1 release, with **225 tests passing and CI green**, and has been verified running on a live Home Assistant instance. Everything below is merged; none of it has shipped to HACS yet. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
+**v1.0.2 is released** — everything below is shipped to HACS. 225 tests passing, CI green, and the integration verified running on a live Home Assistant instance before tagging. **The merge queue is empty apart from [#35](https://github.com/sjmotew/NarwalIntegration/pull/35).**
 
 | Merged since v1.0.1 | What it does |
 |---|---|
@@ -192,9 +179,8 @@ Camera snapshot and LED entities will be added once the AES decryption key is ex
 
 ### Next steps
 
-1. **Cut v1.0.2** — see [`docs/RELEASE-NOTES-v1.0.2.md`](docs/RELEASE-NOTES-v1.0.2.md). This is the immediate priority; the room-clean fix has been sitting unreleased and everyone on HACS is running a version where it does not work.
-2. **Confirm the [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) fix on affected hardware** — it does not reproduce on the development unit, so it ships unvalidated.
-3. **Local discovery** ([#35](https://github.com/sjmotew/NarwalIntegration/pull/35)) — zeroconf and DHCP discovery is the largest outstanding UX win, since [#40](https://github.com/sjmotew/NarwalIntegration/issues/40) shows setup failing outright on the wake timeout. Awaiting a narrowed PR.
+1. **Confirm the [#73](https://github.com/sjmotew/NarwalIntegration/issues/73) fix on affected hardware** — it does not reproduce on the development unit, so it shipped unvalidated. This is the top open question in v1.0.2.
+2. **Local discovery** ([#35](https://github.com/sjmotew/NarwalIntegration/pull/35)) — zeroconf and DHCP discovery is the largest outstanding UX win, since [#40](https://github.com/sjmotew/NarwalIntegration/issues/40) shows setup failing outright on the wake timeout. Awaiting a narrowed PR.
 
 ### Open protocol questions — help wanted
 
