@@ -901,58 +901,79 @@ class NarwalClient:
         """Trigger locate sound — robot says 'Robot is here'."""
         return await self.send_command(TOPIC_CMD_YELL)
 
-    # Legacy clean task payload — works on Flow firmware < v01.07.22.
+    # Legacy clean task payload — the minimal CleanTask the app sent on Flow
+    # firmware < v01.07.22. Only used by the saved-plan fallback below, which
+    # goes to clean/plan/start — a topic that discards payloads entirely (#66),
+    # so these bytes are effectively a no-op marker on current firmware.
     # Structure: {1: {2: {}, 5: {1: {1: 3, 2: 2, 3: 1}, 5: {}}}}
     #   field 5.1.1 = suction level (3=max)
     #   field 5.1.2 = mop humidity (2=wet)
     #   field 5.1.3 = passes (1=single)
-    # On firmware v01.07.22+ (Flow), this returns NOT_APPLICABLE and
-    # start() falls back to the v2 room-list schema. See issue #36.
     _DEFAULT_CLEAN_PAYLOAD = bytes.fromhex("0a0e12002a0a0a060803100218012a00")
 
-    async def start(self, **kwargs) -> CommandResponse:
-        """Start whole-house cleaning.
+    async def _all_room_ids(self) -> list[int]:
+        """Every cleanable room id on the active map, fetching the map if needed."""
+        map_data = self.state.map_data
+        if not (map_data and map_data.rooms):
+            try:
+                map_data = await self.get_map()
+            except Exception:  # noqa: BLE001 — best-effort prefetch
+                _LOGGER.debug("start(): get_map failed; no room list available")
+                map_data = self.state.map_data
+        if not (map_data and map_data.rooms):
+            return []
+        return [r.room_id for r in map_data.rooms if r.room_id > 0]
 
-        Tries the legacy minimal payload first (works on Flow firmware
-        < v01.07.22). If the robot returns NOT_APPLICABLE — observed on
-        firmware v01.07.22.00 in issue #36 — falls back to the v2 schema
-        that includes an explicit room list, mirroring what the Narwal
-        app sends on newer firmware.
+    async def _start_saved_plan(self) -> CommandResponse:
+        """Last-resort start: re-run the plan stored on the robot.
 
-        The v2 fallback requires the map to be loaded (get_map called)
-        so we know which rooms to include.
+        clean/plan/start is StartWithPlan{planId, mapId} — it ignores the
+        payload and re-runs whatever plan the robot already holds, which is
+        usually the last room selection rather than the whole house. Only
+        reachable when no map rooms are known.
         """
-        resp = await self.send_command(
+        _LOGGER.warning(
+            "start(): no map rooms available; falling back to clean/plan/start, "
+            "which re-runs the robot's saved plan rather than cleaning every room"
+        )
+        return await self.send_command(
             TOPIC_CMD_PLAN_START,
             payload=self._DEFAULT_CLEAN_PAYLOAD,
             timeout=10.0,
         )
-        if resp.result_code != CommandResult.NOT_APPLICABLE:
-            return resp
 
-        # Legacy payload rejected — likely newer firmware. Need the room
-        # list from the cached map to build a v2 payload.
-        if not (self.state.map_data and self.state.map_data.rooms):
-            _LOGGER.warning(
-                "start() got NOT_APPLICABLE and no map rooms cached; "
-                "cannot build v2 payload. Call get_map() first."
-            )
-            return resp
+    async def start(
+        self,
+        *,
+        work_mode: WorkMode = WorkMode.VACUUM_AND_MOP,
+        fan: FanLevel = FanLevel.NORMAL,
+        water: MopHumidity = MopHumidity.NORMAL,
+        mop_strength: MopStrengthLevel = MopStrengthLevel.NORMAL,
+        passes: int = 1,
+    ) -> CommandResponse:
+        """Start a whole-house clean.
 
-        room_ids = [r.room_id for r in self.state.map_data.rooms if r.room_id]
+        Enumerates every room on the active map and issues clean/start_clean,
+        matching the app's allRoomIds() path.
+
+        The old implementation sent a minimal payload to clean/plan/start and
+        returned as soon as the result was anything but NOT_APPLICABLE. Newer
+        firmware answers SUCCESS there and does nothing, so the caller saw a
+        successful start that never happened (#69). clean/plan/start is a
+        plan-runner that discards payloads (#66), so it survives only as a
+        last-resort fallback when no map rooms are known.
+        """
+        room_ids = await self._all_room_ids()
         if not room_ids:
-            _LOGGER.warning(
-                "start() got NOT_APPLICABLE but cached map has 0 rooms with IDs"
-            )
-            return resp
-
-        _LOGGER.info(
-            "start(): legacy payload rejected, retrying with v2 schema (%d rooms)",
-            len(room_ids),
-        )
-        payload = self._build_clean_payload_v2(room_ids)
-        return await self.send_command(
-            TOPIC_CMD_PLAN_START, payload=payload, timeout=10.0,
+            return await self._start_saved_plan()
+        _LOGGER.info("start(): whole-house clean over %d rooms", len(room_ids))
+        return await self.start_rooms(
+            room_ids,
+            work_mode=work_mode,
+            fan=fan,
+            water=water,
+            mop_strength=mop_strength,
+            passes=passes,
         )
 
     def _build_clean_payload_v2(
@@ -1163,7 +1184,9 @@ class NarwalClient:
                 see _build_start_clean_payload.
         """
         if not room_ids:
-            return await self.start()
+            # No rooms selected — do not call start(), which would resolve the
+            # full room list and come straight back here.
+            return await self._start_saved_plan()
 
         map_data = self.state.map_data
         if not map_data or not map_data.map_id:

@@ -94,12 +94,18 @@ class TestStartRooms:
         return client
 
     @pytest.mark.asyncio
-    async def test_empty_rooms_calls_start(self) -> None:
-        """start_rooms([]) falls back to whole-house start()."""
+    async def test_empty_rooms_falls_back_to_saved_plan(self) -> None:
+        """start_rooms([]) falls back to the saved plan, not back into start().
+
+        start() now resolves the full room list and calls start_rooms(), so
+        recursing here would loop (#69).
+        """
         client = self._client()
-        with patch.object(client, "start", new_callable=AsyncMock) as mock_start:
+        with patch.object(
+            client, "_start_saved_plan", new_callable=AsyncMock
+        ) as mock_plan:
             await client.start_rooms([])
-            mock_start.assert_awaited_once()
+            mock_plan.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_forwards_settings_to_payload(self) -> None:

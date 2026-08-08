@@ -8,7 +8,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from narwal_client.client import NarwalClient, NarwalConnectionError
-from narwal_client.const import AmbientLightCtrlType, CommandResult
+from narwal_client.const import (
+    TOPIC_CMD_CLEAN_TASK,
+    TOPIC_CMD_PLAN_START,
+    AmbientLightCtrlType,
+    CommandResult,
+    FanLevel,
+)
 from narwal_client.models import CommandResponse, MapData, RoomInfo
 
 
@@ -134,8 +140,13 @@ class TestBuildCleanPayloadV2:
         assert v2 != client._DEFAULT_CLEAN_PAYLOAD
 
 
-class TestStartLegacyAndV2Fallback:
-    """Tests for the start() legacy → v2 fallback (issue #36)."""
+class TestWholeHouseStart:
+    """start() must route a whole-house clean through clean/start_clean (#69).
+
+    The old implementation sent a minimal payload to clean/plan/start and
+    returned on any result other than NOT_APPLICABLE. Newer firmware answers
+    SUCCESS there and does nothing, so callers saw a start that never happened.
+    """
 
     def _connected_client(self) -> NarwalClient:
         client = NarwalClient("127.0.0.1")
@@ -144,9 +155,12 @@ class TestStartLegacyAndV2Fallback:
         return client
 
     @pytest.mark.asyncio
-    async def test_start_returns_legacy_response_on_success(self) -> None:
-        """If legacy payload succeeds (code=1), no v2 retry happens."""
+    async def test_start_uses_start_clean_with_every_room(self) -> None:
+        """Cached map rooms are all enumerated onto clean/start_clean."""
         client = self._connected_client()
+        client.state.map_data = MapData(
+            map_id=1, rooms=[RoomInfo(room_id=11), RoomInfo(room_id=14)]
+        )
         success = CommandResponse(result_code=CommandResult.SUCCESS)
 
         with patch.object(
@@ -156,64 +170,95 @@ class TestStartLegacyAndV2Fallback:
             result = await client.start()
 
         assert result is success
-        mock_send.assert_awaited_once()  # no fallback fired
+        topic = mock_send.await_args_list[0].args[0]
+        assert topic == TOPIC_CMD_CLEAN_TASK
+        assert topic != TOPIC_CMD_PLAN_START
 
     @pytest.mark.asyncio
-    async def test_start_falls_back_to_v2_on_not_applicable(self) -> None:
-        """NOT_APPLICABLE from legacy triggers v2 retry with cached rooms."""
+    async def test_start_never_returns_early_on_plan_start_success(self) -> None:
+        """Regression guard for #69: no path returns a bare clean/plan/start ack."""
         client = self._connected_client()
-        client.state.map_data = MapData(rooms=[
-            RoomInfo(room_id=11),
-            RoomInfo(room_id=14),
-        ])
-
-        not_applicable = CommandResponse(result_code=CommandResult.NOT_APPLICABLE)
-        success = CommandResponse(result_code=CommandResult.SUCCESS)
+        client.state.map_data = MapData(map_id=1, rooms=[RoomInfo(room_id=3)])
 
         with patch.object(
             client, "send_command", new_callable=AsyncMock
         ) as mock_send:
-            mock_send.side_effect = [not_applicable, success]
-            result = await client.start()
+            mock_send.return_value = CommandResponse(
+                result_code=CommandResult.SUCCESS
+            )
+            await client.start()
 
-        assert mock_send.await_count == 2
-        # Second call's payload must be v2 (different bytes from legacy)
-        second_payload = mock_send.await_args_list[1].kwargs.get("payload")
-        assert second_payload is not None
-        assert second_payload != client._DEFAULT_CLEAN_PAYLOAD
-        assert result is success
+        sent_topics = [call.args[0] for call in mock_send.await_args_list]
+        assert TOPIC_CMD_PLAN_START not in sent_topics
 
     @pytest.mark.asyncio
-    async def test_start_returns_not_applicable_when_no_map_cached(self) -> None:
-        """NOT_APPLICABLE without a cached map surfaces the error
-        instead of crashing — user just needs to load the map first."""
+    async def test_start_forwards_clean_settings(self) -> None:
+        """Clean params reach the CleanTask payload rather than being dropped."""
+        client = self._connected_client()
+        client.state.map_data = MapData(map_id=1, rooms=[RoomInfo(room_id=6)])
+
+        with patch.object(
+            client, "start_rooms", new_callable=AsyncMock
+        ) as mock_rooms:
+            mock_rooms.return_value = CommandResponse(
+                result_code=CommandResult.SUCCESS
+            )
+            await client.start(fan=FanLevel.STRONG, passes=2)
+
+        assert mock_rooms.await_args.args[0] == [6]
+        assert mock_rooms.await_args.kwargs["fan"] is FanLevel.STRONG
+        assert mock_rooms.await_args.kwargs["passes"] == 2
+
+    @pytest.mark.asyncio
+    async def test_start_falls_back_to_saved_plan_without_rooms(self) -> None:
+        """No map rooms — fall back to clean/plan/start as a last resort."""
         client = self._connected_client()
         assert client.state.map_data is None
-
-        not_applicable = CommandResponse(result_code=CommandResult.NOT_APPLICABLE)
+        plan_resp = CommandResponse(result_code=CommandResult.SUCCESS)
 
         with patch.object(
+            client, "get_map", new_callable=AsyncMock
+        ) as mock_map, patch.object(
             client, "send_command", new_callable=AsyncMock
         ) as mock_send:
-            mock_send.return_value = not_applicable
+            mock_map.side_effect = RuntimeError("no map")
+            mock_send.return_value = plan_resp
             result = await client.start()
 
-        mock_send.assert_awaited_once()  # no v2 retry without rooms
-        assert result.result_code == CommandResult.NOT_APPLICABLE
+        assert result is plan_resp
+        mock_send.assert_awaited_once()
+        assert mock_send.await_args.args[0] == TOPIC_CMD_PLAN_START
 
     @pytest.mark.asyncio
-    async def test_start_skips_v2_when_map_has_no_room_ids(self) -> None:
-        """Map present but every room_id is 0 — don't send junk."""
+    async def test_start_ignores_zero_room_ids(self) -> None:
+        """A map whose rooms all have id 0 is treated as having no rooms."""
         client = self._connected_client()
-        client.state.map_data = MapData(rooms=[RoomInfo(room_id=0)])
-
-        not_applicable = CommandResponse(result_code=CommandResult.NOT_APPLICABLE)
+        client.state.map_data = MapData(map_id=1, rooms=[RoomInfo(room_id=0)])
 
         with patch.object(
             client, "send_command", new_callable=AsyncMock
         ) as mock_send:
-            mock_send.return_value = not_applicable
-            result = await client.start()
+            mock_send.return_value = CommandResponse(
+                result_code=CommandResult.SUCCESS
+            )
+            await client.start()
+
+        assert mock_send.await_args.args[0] == TOPIC_CMD_PLAN_START
+
+    @pytest.mark.asyncio
+    async def test_start_rooms_with_empty_list_does_not_recurse(self) -> None:
+        """start_rooms([]) must not bounce back into start() and loop."""
+        client = self._connected_client()
+        client.state.map_data = MapData(map_id=1, rooms=[RoomInfo(room_id=2)])
+
+        with patch.object(
+            client, "send_command", new_callable=AsyncMock
+        ) as mock_send:
+            mock_send.return_value = CommandResponse(
+                result_code=CommandResult.SUCCESS
+            )
+            result = await client.start_rooms([])
 
         mock_send.assert_awaited_once()
-        assert result.result_code == CommandResult.NOT_APPLICABLE
+        assert mock_send.await_args.args[0] == TOPIC_CMD_PLAN_START
+        assert result.result_code == CommandResult.SUCCESS
