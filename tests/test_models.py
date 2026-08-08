@@ -278,6 +278,16 @@ class TestNarwalState:
         state.update_from_base_status({"15": 4})
         assert state.terminate_reason == 4  # LOW_BATTERY_FORCE_END
 
+    def test_consumable_info_parse(self) -> None:
+        """consumable/get_consumable_info → maintain/replace alert lists; empty clears."""
+        state = NarwalState()
+        state.update_from_consumable_info({"1": {"1": [1, 9], "2": 8}})
+        assert state.maintain_items == [1, 9]  # dust_box, water_tank_sponge
+        assert state.replace_items == [8]  # dust_bag
+        state.update_from_consumable_info({"1": {}})  # healthy
+        assert state.maintain_items == []
+        assert state.replace_items == []
+
     def test_update_from_upgrade_status(self) -> None:
         state = NarwalState()
         state.update_from_upgrade_status({
