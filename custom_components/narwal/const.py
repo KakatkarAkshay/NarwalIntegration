@@ -54,6 +54,15 @@ MAP_OPTION_DEFAULTS: dict[str, bool] = {
     CONF_SHOW_FURNITURE_LABELS: False,
 }
 
+# Map view options read from the config entry's options by camera.py and applied by
+# map_renderer.render_* . There is no options flow to set them yet, so they stay at
+# their defaults — an unrotated, unzoomed map, i.e. the pre-#62 rendering.
+CONF_MAP_ROTATION = "map_rotation"
+CONF_MAP_ZOOM = "map_zoom"
+
+MAP_ROTATION_DEFAULT = 0  # degrees clockwise; renderer accepts 0/90/180/270
+MAP_ZOOM_DEFAULT = 1.0  # renderer clamps to 1.0–2.0
+
 CONF_DOCK_LIGHT_SUPPORTED = "dock_light_supported"
 
 DOCK_LIGHT_PRODUCT_KEYS = {"QxMSPG6VSO", "iSuVlI1If2"}
