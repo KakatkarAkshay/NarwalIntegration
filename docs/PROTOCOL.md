@@ -56,6 +56,10 @@ but the CX7 is an exception: it only responds to topics containing product key `
 and its real cloud-assigned device ID. See the README's compatibility table for the current
 per-model state.
 
+This identity is verified for one global CX7/J5 on firmware `v01.13.11.02`. Earlier reports in
+issue #5 associated CX7 with `BYWBPqSxeC` and firmware `1.12.10.02`; that key did not answer
+addressed probes on the verified robot, and remains an unresolved regional or platform variant.
+
 ---
 
 ## 2. Frame format
@@ -158,7 +162,9 @@ so treat a non-integer field 1 as a successful data response.
 Most robots sleep aggressively. While awake they broadcast status every ~1.5 s; while asleep
 they send nothing and ignore most commands — including map requests, which is the usual reason
 rooms fail to appear in a fresh install. The CX7 never broadcasts and instead relies on
-addressed polling, including `status/get_device_base_status`.
+addressed polling, including `status/get_device_base_status`. Clients must treat successful
+field5 responses as reachability for such models rather than waiting for a broadcast, renewing
+broadcast subscriptions, or reconnecting when broadcasts do not arrive.
 
 Working model:
 
