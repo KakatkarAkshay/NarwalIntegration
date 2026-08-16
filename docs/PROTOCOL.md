@@ -277,7 +277,11 @@ app  : 0a1e080112160a0408011003120c08041004180120033803400218011a002804
 ```
 
 Structurally identical. One field differs: `CleanParam` tag 8 = 2, which the app sends and we
-never do. Its meaning is still open — see §11.
+never do. **Tag 8 is the coverage-precision setting** — 1 = *Standard*, 2 = *Meticulous* —
+settled by a controlled capture pair on AX26 in which only that toggle moved and only the
+byte `40 01` → `40 02` changed ([#70](https://github.com/sjmotew/NarwalIntegration/issues/70),
+[#25](https://github.com/sjmotew/NarwalIntegration/issues/25)). The captured app task was
+simply set to *Meticulous*.
 
 ---
 
@@ -585,17 +589,14 @@ reactively.
 
 Concrete, and each one is answerable with a capture rather than an argument:
 
-**`CleanParam` tag 8 = 2.** The one field the app sends in every captured clean task and we
-never do (§6). Leading hypothesis: it is the app's coverage-precision setting — a two-value
-toggle (*Standard* / *Meticulous*) that appears in both the suction and mopping tabs, so it is
-not a mop parameter. Testable by capturing `clean/current_clean_task/get` twice with only that
-setting changed.
-
-**How many suction levels exist.** The APK proto carries five (`MUTE`, `NORMAL`, `STRONG`,
-`DEEP`, `SUPER`, values 1–5); the app UI on AX26 presents four. Unresolved whether `DEEP` is a
-hidden tier or whether the enum is over-broad — and note that this integration currently ships
-a *zero-based four-value* enum, so if the five-value reading is right, every fan speed it has
-ever sent is off by one tier.
+**How many suction levels exist — partly answered.** The APK proto carries five (`MUTE`,
+`NORMAL`, `STRONG`, `DEEP`, `SUPER`, values 1–5). AX26 captures show the app's highest tier
+sending tag 2 = **4** (`DEEP`), with the tier below it sending 3 (`STRONG`), so the five-value
+reading is correct and `SUPER` (5) is simply unreachable from that app's UI
+([#70](https://github.com/sjmotew/NarwalIntegration/issues/70)). Still open: whether any model
+exposes 5, or whether `SUPER` exists only on the task path. Note that the live
+`clean/set_fan_level` enum (`SweepFanLevel`) has no `SUPER` at all and the app maps it down to
+`STRONG` there.
 
 **The error state.** No `WorkingStatus` value for a fault has ever been observed. Until one is,
 a robot error cannot be represented at all.

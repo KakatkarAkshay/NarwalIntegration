@@ -85,19 +85,41 @@ DOCK_LIGHT_MODE_NAMES: dict[int, str] = {
     int(value): key for key, value in DOCK_LIGHT_MODES.items()
 }
 
-# HA fan_speed labels → FanLevel, verbatim from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super powerful" and SUPER as "Ultra powerful".
+# HA fan_speed labels → FanLevel, from the app's user-visible suction names (sentence case, as HA shows fan_speed values directly). The enum members keep the app's internal identifiers, so DEEP surfaces as "Super" and SUPER as "Ultra".
 _FAN_SPEED_CANONICAL: dict[str, FanLevel] = {
     "Quiet": FanLevel.MUTE,
     "Standard": FanLevel.NORMAL,
     "Strong": FanLevel.STRONG,
-    "Super powerful": FanLevel.DEEP,
-    "Ultra powerful": FanLevel.SUPER,
+    "Super": FanLevel.DEEP,
+    "Ultra": FanLevel.SUPER,
 }
 
 FAN_SPEED_LIST: list[str] = list(_FAN_SPEED_CANONICAL)
 
-# FAN_SPEED_MAP also accepts the original lowercase fan_speed values (quiet/normal/strong/max) so existing automations keep working; these aliases are not offered in FAN_SPEED_LIST.
+# Models whose app exposes only four suction tiers: FanLevel.SUPER (5) is unreachable
+# there, and the live clean/set_fan_level enum (SweepFanLevel) has no SUPER at all, so
+# offering "Ultra" would silently apply Strong. AX26 confirmed by app captures in #70 —
+# its top tier ("Super powerful" / "super puissant") sends CleanParam tag 2 = 4 (DEEP).
+NO_ULTRA_FAN_PRODUCT_KEYS: frozenset[str] = frozenset({"qV6BujoYLz"})
+
+
+def fan_speed_list_for(data: dict) -> list[str]:
+    """fan_speed options for this configured model — no "Ultra" where 5 is unreachable."""
+    if data.get(CONF_PRODUCT_KEY) in NO_ULTRA_FAN_PRODUCT_KEYS:
+        return [
+            label
+            for label, level in _FAN_SPEED_CANONICAL.items()
+            if level is not FanLevel.SUPER
+        ]
+    return FAN_SPEED_LIST
+
+
+# FAN_SPEED_MAP also accepts the "… powerful" labels shipped through v1.0.3 and the
+# original lowercase fan_speed values (quiet/normal/strong/max) so existing automations
+# keep working; these aliases are not offered in FAN_SPEED_LIST.
 FAN_SPEED_MAP: dict[str, FanLevel] = _FAN_SPEED_CANONICAL | {
+    "Super powerful": FanLevel.DEEP,
+    "Ultra powerful": FanLevel.SUPER,
     "quiet": FanLevel.MUTE,
     "normal": FanLevel.NORMAL,
     "strong": FanLevel.STRONG,

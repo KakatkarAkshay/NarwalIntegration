@@ -24,7 +24,7 @@ from .narwal_client import CommandResult, WorkingStatus
 from .narwal_client.const import ACTIVE_CLEANING_STATUSES
 
 from . import NarwalConfigEntry
-from .const import FAN_SPEED_LIST, FAN_SPEED_MAP
+from .const import FAN_SPEED_LIST, FAN_SPEED_MAP, fan_speed_list_for
 from .coordinator import NarwalCoordinator
 from .entity import NarwalEntity
 
@@ -75,12 +75,13 @@ class NarwalVacuum(NarwalEntity, RestoreEntity, StateVacuumEntity):
         | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.LOCATE
     ) | (VacuumEntityFeature.CLEAN_AREA if Segment is not None else VacuumEntityFeature(0))
-    _attr_fan_speed_list = FAN_SPEED_LIST
 
     def __init__(self, coordinator: NarwalCoordinator) -> None:
         """Initialize the vacuum entity."""
         super().__init__(coordinator)
         self._attr_unique_id = coordinator.config_entry.data["device_id"]
+        # Offered tiers are per-model: models whose app tops out at DEEP don't get "Ultra".
+        self._attr_fan_speed_list = fan_speed_list_for(coordinator.config_entry.data)
 
     async def async_added_to_hass(self) -> None:
         """Restore the pending fan speed into clean_settings (persists across restarts)."""
