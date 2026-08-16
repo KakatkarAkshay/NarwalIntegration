@@ -1399,11 +1399,15 @@ class NarwalClient:
         resp = await self.send_command(TOPIC_CMD_GET_BASE_STATUS)
         status_data = resp.data.get("2", {})
         if status_data:
+            # Log the whole field map, not a chosen few: field-level bug reports
+            # (wrong tank state, a value we don't map) are unanswerable from a log
+            # that omits the field in question — see #77.
             _LOGGER.debug(
-                "get_status response (full=%s): field3=%r, field2=%r",
+                "get_status response (full=%s): field3=%r, field2=%r, all_fields=%r",
                 full_update,
                 status_data.get("3") if isinstance(status_data, dict) else None,
                 status_data.get("2") if isinstance(status_data, dict) else None,
+                status_data,
             )
             if full_update:
                 self.state.update_from_base_status(status_data)
