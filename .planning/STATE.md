@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.5
-milestone_name: milestone
-status: Phase 14 ARCHIVED (cloud-only)
-stopped_at: Phase 14 archived after probe confirmed shortcuts are cloud-only
-last_updated: "2026-04-02T00:10:00.000Z"
-last_activity: 2026-04-01 -- Phase 14 archived (shortcuts cloud-only, not local WS)
+milestone_name: Map Validation & Polish
+status: "v1.0.3 RELEASED 2026-08-08 — #73 root-caused and fixed on hardware; queue drained"
+stopped_at: "**v1.0.3 published 2026-08-08** (latest, manifest 1.0.3). #73 root cause found on hardware during a live Pantry clean: the active_robot_publish subscription lasts 600s and was never renewed, so working_status/display_map stopped and the entity froze at docked. Renewal now runs unconditionally every 240s. Counts: expired 423/1/1 -> renewing 411/148/148. #73 CLOSED. v1.0.2 notes corrected in repo and on the release. Announced on #37/#55/#66/#40."
+last_updated: "2026-08-08T00:00:00.000Z"
+last_activity: 2026-08-08
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 7
   total_plans: 15
   completed_plans: 13
-  percent: 100
+  percent: 78
 ---
 
 # Project State
@@ -21,16 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Users can control and monitor their Narwal Flow vacuum entirely locally — start/stop/pause, see status, view a live floor map — without any cloud dependency.
-**Current focus:** Phase 14 ARCHIVED — shortcuts cloud-only, no local WS API access
+**Current focus:** Phase 15 — room-clean rewrite via clean/start_clean + consolidating four contributor forks (issue #66)
 
 ## Current Position
 
-Phase: 14 (shortcuts-presets) — ARCHIVED
-Last activity: 2026-04-01 -- Probe confirmed shortcuts are cloud-managed (Alibaba Alink IoT REST), not local WS
+Phase: 15 (room-clean-rewrite-and-fork-consolidation) — in ROADMAP.md as of 2026-08-07
+Last activity: 2026-08-07
 
-Progress: [██████████] 100% (13 plans done)
+**RESUME HERE:** see `.planning/.continue-here.md` (HANDOFF.json consumed and deleted)
+
+Progress: Phase 15 executed as issue/PR work, not formal plans — 8 of 9 merge steps done, v1.0.2 pending
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 15 added: Room-Clean Rewrite and Fork Consolidation (backfilled 2026-08-07; ran as maintainer work from 2026-07-27)
 
 ### Key Decisions (Phase 8)
 
@@ -95,10 +101,29 @@ Progress: [██████████] 100% (13 plans done)
 
 ### Blockers/Concerns
 
-None
+- ~~**PR #49 likely fails on our firmware (v01.08.03.07).**~~ **RESOLVED 2026-08-06, MERGED 2026-08-07 (`05af870`).** @Zebble ran #49 on a Flow 1 (AX12) at v01.08.03.07 — our exact rig: two-room clean, SUCCESS first attempt, correct rooms and order, ~35 min, no errors. `ZoneOption` field 4 is **not** required on any known firmware. Second confirmation after @shin906710 (AX26, v01.02.00.15). We never had to move the robot.
+- #37 **closed** 2026-08-07.
+- Open, non-blocking: is `FanLevel.DEEP` a real fifth suction tier, or does the label need model-gating? AX26's app UI shows four (#70). `CleanParam` tag 8 still unexplained (#25).
+- Still conflicting and awaiting contributor rebases: #50, #24, #35.
+
+### Key Decisions (Phase 15)
+
+- REVERSED: `clean/plan/start` is a plan-runner that discards payloads; `clean/start_clean` is the real room-clean command. Confirmed independently by three contributors. ~2 months of payload-schema work was against the wrong topic.
+- REVERSED: `ROOM_TYPE_NAMES` is misaligned from index 5 for all models; room naming takes no model argument. The Flow 2 override map (5b4dac7) was a band-aid and PR #48 deletes it.
+- @jgus's stack (#47-#54) is the merge base over @Sean-StarLabs's larger #58-#65 stack — one concern per PR beats take-it-or-leave-it.
+- Declined `cloud.py` (#65) on "fully local, no cloud" positioning.
+- Shipped README known-broken warnings before the fixes merged (e3aef09).
 
 ## Session Continuity
 
-Last session: 2026-04-01T19:43:49.100Z
-Stopped at: Completed 13-01-PLAN.md
-Resume file: None
+Last session: 2026-08-08
+Stopped at: **v1.0.2 and v1.0.3 both shipped.** master `a28e73e`, 230 tests, CI green, running on the live HA instance.
+- Drained the merge queue (#53, #54, #50, #62, #61, #24, #63 merged maintainer-side), fixed #69, released v1.0.2.
+- Live-deploy before tagging caught two release blockers CI structurally cannot see (switch.py EntityCategory import; camera.py's 4 undeclared const names from #62). Two AST guards added: test_intra_package_imports, test_translation_keys.
+- **#73 root-caused on hardware during a live Pantry clean and CLOSED**: the active_robot_publish subscription lasts 600s and was never renewed; once lapsed the robot stops broadcasting working_status/display_map. Renewal now runs unconditionally every 240s. See [[broadcast-subscription-expires]]. v1.0.2's "does not reproduce" claim was wrong and is corrected in the repo and on the published release.
+- Room cleaning verified end to end: segment 12 = Pantry, clean/start_clean, mode=VACUUM fan=STRONG passes=2 all applied, entity tracked 2.58 -> 9.5 m2 then docked.
+- HA side: new top-level "Narwal" dashboard (YAML mode, /config/narwal-dashboard.yaml, 4 views), Vacuum Test view removed from Overview_old. Clean-a-room buttons are generated from the live area_mapping by scratchpad/gen_rooms.py — re-run it after mapping more rooms.
+- 6 of 22 rooms mapped. User plans a fresh full-house map in the Narwal app, then will align HA areas/floors. Remap renumbers segments and invalidates the mapping (repair issue fires).
+Next: **#75** (new) — cleaning trail does not persist across a session; trail is entity-local state on the camera and any not-cleaning->cleaning flap calls _reset_trail(); also hardcodes (CLEANING, CLEANING_ALT) instead of ACTIVE_CLEANING_STATUSES. Diagnosis is from source only, unverified. Then #74 (China-region Flow); #35 awaits @StratoGh0st99's narrowed zeroconf/DHCP PR; #43 (multi-floor) matters if the remap produces more than one map.
+HA access: `claude_debug_token` stays in HA secrets.yaml **deliberately** — user accepted the risk for ongoing direct access (log reads via /api/hassio/core/logs, websocket for segments/mapping). Do not remove it.
+Resume file: `.planning/.continue-here.md` — **rewritten as the #75 trail-persistence plan** (6 tasks, verify-first; task 1 must reproduce before any refactor). Phase 15 material now lives in phases/15-*/15-LEARNINGS.md.

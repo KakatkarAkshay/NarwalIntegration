@@ -9,6 +9,7 @@
 - 📋 **Phase 12: Camera & Patrol** — Snapshot capture, patrol/cruise, LED control, live feed RE
 - 📋 **Phase 13: Community Fixes & Multi-Model** — Critical bug fixes, X10 Pro support, room clean investigation
 - 🗃️ **Phase 14: Shortcuts & Presets** — ARCHIVED (cloud-only, not accessible via local WS API)
+- 📋 **Phase 15: Room-Clean Rewrite & Fork Consolidation** — wrong-topic root cause, five-fork merge, v1.0.2
 
 ## Phases
 
@@ -147,9 +148,49 @@ Plans:
 Issues:
 - #13 — Feature request from @ShifuSonny (Flow user) — findings posted
 
+### 📋 Phase 15: Room-Clean Rewrite and Fork Consolidation
+
+**Goal**: Fix room cleaning at the root — it had been sent to the wrong WebSocket topic since Phase 9 — and consolidate the five contributor forks that independently found the bug, ending with a v1.0.2 release.
+**Depends on:** Phase 13
+**Backfilled:** 2026-08-07. This phase ran as GitHub maintainer work from 2026-07-27 onward and was reconstructed into the roadmap after the fact.
+**Plans:** 0 formal plans — executed as issue/PR work, tracked in issue #66
+
+**Root cause (the whole phase turns on this):** `clean/plan/start` is `StartWithPlan{planId, mapId}`. It runs the plan stored in the Narwal app and **discards any payload sent with it**, while returning `SUCCESS`. Every room-clean fix from Phase 9 through 2026-07 corrected the payload schema on a topic that never read it. `clean/start_clean` (`StartClean` → `CleanTask`) is the correct command. Found independently by @jgus (#49), @Sean-StarLabs (#58) and @sytchi (#37) before the maintainer accepted it.
+
+Work completed:
+- [x] Triage of 19 open issues and 19 open PRs; merge plan published as #66
+- [x] `docs/PROTOCOL.md` published (`35509cd`) — frame format, topic namespace, CleanTask schema, and a public Corrections section
+- [x] #47 (`276120d`) config-flow translation sync
+- [x] #48 (`17ba151`) room-type names from the app's own strings — closes #22; reverted once, relanded after @jgus supplied a blutter object-pool dump
+- [x] #51 (`5a4c2d8`) cleaning area from `coveredArea`
+- [x] #52 (`68b5e0d`) `base_status` field audit + station diagnostics
+- [x] #71 (`ecc36bb`) asyncio deprecation on Python 3.12
+- [x] #72 (`a3edc57`) warn once per unmapped `working_status` — closes #46
+- [x] #67 (`029f847`) carpet-map camera + `working_status 7` → REMAPPING
+- [x] `64c6edd` AX26 (Freo Z10 Pro / Turbo) in the model selector — #40, #70
+- [x] `f0ec580` Narwal JX product key `CGjuB6dzq7` — #42
+- [x] **#49 (`05af870`) room clean via `clean/start_clean` — closes #37, #25**
+- [ ] v1.0.2 release — README rewrite, manifest bump, breaking-change notes
+- [ ] Remaining merge queue: #50, #53, #54, #61, #62, #63, #24, #35
+
+**Success criteria**:
+1. Room cleaning cleans the rooms selected in Home Assistant — ✅ confirmed on hardware
+2. Confirmed on more than one model and firmware line — ✅ AX26 v01.02.00.15 (@shin906710) and AX12 v01.08.03.07 (@Zebble)
+3. Contributor forks consolidated rather than left to diverge — 8 of 9 planned merge steps done
+4. The wrong-topic failure documented publicly so it can't be re-derived — ✅ `docs/PROTOCOL.md` §Corrections
+5. Shipped to users — ⏳ pending v1.0.2
+
+**Reversals recorded**:
+- `clean/plan/start` is **not** the room-clean topic (held from Phase 9 to 2026-07)
+- `ROOM_TYPE_NAMES` was misaligned from index 5 for **every** model; naming takes no model argument, so the per-model override added for #22 was entrenching the bug
+- `ZoneOption` field 4 is **not** required on any known firmware — a contributor report held the merge ~10 days before two hardware runs disproved it
+- `FanLevel` was off by one tier for the project's entire history (`QUIET=0..MAX=3` → the proto's `MUTE=1..SUPER=5`)
+
+Issues: #37 (closed), #22 (closed), #46 (closed), #25, #55, #66, #69, #70, #73
+
 ## Progress
 
-**Execution Order:** Phase 9 → Phase 10 → Phase 11 → Phase 12 → Phase 13 → Phase 14
+**Execution Order:** Phase 9 → Phase 10 → Phase 11 → Phase 12 → Phase 13 → Phase 14 → Phase 15
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
@@ -160,3 +201,4 @@ Issues:
 | 12. Camera & Patrol | In Progress (plan 01 done) | - |
 | 13. Community Fixes & Multi-Model | Complete | 2026-04-01 |
 | 14. Shortcuts & Presets | ARCHIVED | 2026-04-01 |
+| 15. Room-Clean Rewrite & Fork Consolidation | In Progress (#49 merged, v1.0.2 pending) | - |
